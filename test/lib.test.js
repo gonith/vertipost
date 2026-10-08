@@ -1,0 +1,68 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { challenge } = require('../src/main/lib/pkce');
+const { MB, fixedChunks, tiktokPlan } = require('../src/main/lib/chunks');
+const { captionFor, warnings } = require('../src/main/lib/rules');
+
+test('challenge PKCE : vecteur de la RFC 7636 en base64url, même condensat en hex pour TikTok', () => {
+  const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+  assert.equal(challenge(verifier), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+  assert.equal(challenge(verifier, 'hex'), Buffer.from(challenge(verifier), 'base64url').toString('hex'));
+});
+
+function assertCovers(chunks, size) {
+  let next = 0;
+  for (const c of chunks) {
+    assert.equal(c.start, next);
+    assert.ok(c.end >= c.start);
+    next = c.end + 1;
+  }
+  assert.equal(next, size);
+}
+
+test('fixedChunks couvre le fichier sans trou ni recouvrement', () => {
+  for (const size of [1, 4 * MB, 4 * MB + 1, 9 * MB + 123]) {
+    const chunks = fixedChunks(size, 4 * MB);
+    assertCovers(chunks, size);
+    assert.equal(chunks.length, Math.ceil(size / (4 * MB)));
+  }
+});
+
+test('tiktokPlan : un seul bloc jusqu\'à 64 Mo', () => {
+  for (const size of [1, 3 * MB, 64 * MB]) {
+    const plan = tiktokPlan(size);
+    assert.equal(plan.chunks.length, 1);
+    assert.equal(plan.chunkSize, size);
+    assertCovers(plan.chunks, size);
+  }
+});
+
+test('tiktokPlan : au-delà, floor(taille / tranche) tranches et la dernière absorbe le reste', () => {
+  for (const size of [64 * MB + 1, 100 * MB, 105 * MB + 7, 999 * MB + 999]) {
+    const plan = tiktokPlan(size);
+    assertCovers(plan.chunks, size);
+    assert.equal(plan.chunks.length, Math.floor(size / plan.chunkSize));
+    const sizes = plan.chunks.map((c) => c.end - c.start + 1);
+    for (const s of sizes.slice(0, -1)) assert.equal(s, plan.chunkSize);
+    assert.ok(sizes.at(-1) >= plan.chunkSize && sizes.at(-1) <= 128 * MB);
+    assert.ok(plan.chunkSize >= 5 * MB && plan.chunkSize <= 64 * MB);
+  }
+});
+
+test('captionFor préfère la légende propre à la plateforme, sauf si elle est vide', () => {
+  const post = { caption: 'commune', overrides: { x: 'pour X', youtube: '   ' } };
+  assert.equal(captionFor('x', post), 'pour X');
+  assert.equal(captionFor('youtube', post), 'commune');
+  assert.equal(captionFor('instagram', post), 'commune');
+});
+
+test('warnings signale longueur, titre, orientation et durée', () => {
+  const vertical = { width: 1080, height: 1920, duration: 30 };
+  assert.deepEqual(warnings('youtube', { title: 'ok', caption: 'ok' }, vertical), []);
+  assert.equal(warnings('youtube', { title: '', caption: '' }, vertical).length, 1);
+  assert.equal(warnings('x', { caption: 'a'.repeat(281) }, vertical).length, 1);
+  assert.equal(warnings('x', { caption: 'a'.repeat(281), overrides: { x: 'court' } }, vertical).length, 0);
+  assert.equal(warnings('instagram', { caption: '' }, { width: 1920, height: 1080, duration: 30 }).length, 1);
+  assert.equal(warnings('x', { caption: '' }, { ...vertical, duration: 141 }).length, 1);
+  assert.deepEqual(warnings('tiktok', { caption: '' }, null), []);
+});

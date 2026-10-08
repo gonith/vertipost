@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src file:">
+  <title>Vertipost</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <section class="video">
+      <div id="drop" class="drop" tabindex="0" role="button">
+        <video id="preview" controls muted hidden></video>
+        <p id="drop-hint">Dépose une vidéo verticale ici<br><span>ou clique pour la choisir (.mp4, .mov)</span></p>
+      </div>
+      <p id="file-info" class="muted"></p>
+      <button id="change" class="ghost" hidden>Changer de vidéo</button>
+    </section>
+
+    <section class="form">
+      <label>Titre <span class="muted">(YouTube)</span>
+        <input id="title" type="text" maxlength="100" placeholder="Le titre de ton Short">
+      </label>
+      <label>Légende <span class="muted">(toutes les plateformes, hashtags compris)</span>
+        <textarea id="caption" rows="4" placeholder="Ta légende #shorts"></textarea>
+      </label>
+      <label class="inline">Visibilité sur YouTube
+        <select id="privacy">
+          <option value="public">Publique</option>
+          <option value="unlisted">Non répertoriée</option>
+          <option value="private">Privée</option>
+        </select>
+      </label>
+
+      <h2>Plateformes</h2>
+      <div id="platforms"></div>
+
+      <p id="error" class="bad" hidden></p>
+      <button id="publish" class="primary" disabled>Publier</button>
+    </section>
+  </main>
+
+  <dialog id="settings">
+    <form method="dialog">
+      <h2 id="settings-title"></h2>
+      <ol id="settings-help"></ol>
+      <label>Adresse de redirection à déclarer dans l'application
+        <input id="settings-redirect" type="text" readonly>
+      </label>
+      <div id="settings-fields"></div>
+      <p id="settings-error" class="bad" hidden></p>
+      <div class="row">
+        <button id="settings-console" type="button" class="ghost">Ouvrir la console développeur</button>
+        <span class="grow"></span>
+        <button id="settings-cancel" type="button" class="ghost">Annuler</button>
+        <button type="submit" class="primary">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

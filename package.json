@@ -1,0 +1,26 @@
+{
+  "name": "vertipost",
+  "version": "0.1.0",
+  "description": "Publie une vidéo verticale sur YouTube Shorts, Instagram Reels, TikTok et X en une fois.",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "dev.thibautg.vertipost",
+    "productName": "Vertipost",
+    "files": [
+      "src/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.6.0",
+    "electron-builder": "^26.15.3"
+  }
+}
