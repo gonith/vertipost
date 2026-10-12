@@ -118,3 +118,13 @@ test('split : une programmation en retard part dans le délai toléré, sinon el
   assert.deepEqual(due.map((j) => j.id), ['pile', 'limite']);
   assert.deepEqual(missed.map((j) => j.id), ['tard']);
 });
+
+test("warnings : le format d'un Reel n'est contrôlé que pour Instagram, et seulement sur les données connues", () => {
+  const post = { title: 'T', caption: 'c' };
+  const good = { width: 1080, height: 1920, duration: 30, size: 50 * MB, videoCodec: 'h264', fps: 59.94, bitrate: 8e6, audioCodec: 'aac', sampleRate: 48000, channels: 2, moovFirst: true };
+  assert.deepEqual(warnings('instagram', post, good), []);
+  assert.deepEqual(warnings('instagram', post, { width: 1080, height: 1920, duration: 30 }), []);
+  const bad = { ...good, width: 2160, height: 3840, size: 400 * MB, videoCodec: 'vp9', fps: 120, bitrate: 40e6, audioCodec: 'opus', sampleRate: 96000, channels: 6, duration: 2, moovFirst: false };
+  assert.equal(warnings('instagram', post, bad).length, 10);
+  assert.deepEqual(warnings('youtube', post, bad), []);
+});
