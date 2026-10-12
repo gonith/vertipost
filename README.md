@@ -34,19 +34,11 @@ reposent sur les règles générales du format court.
 La grille **Pertinence** fonctionne sans IA : elle coche, à partir de tes mots-clés de niche, les
 bonnes pratiques que ton titre et ta légende respectent (`src/main/lib/score.js`).
 
-## Programmer une publication
-
-Le bouton **Programmer** garde la vidéo, les textes et les plateformes cochées, et publie à l'heure
-choisie. C'est Vertipost qui envoie : l'application doit être ouverte et l'ordinateur allumé à ce
-moment-là. Une programmation dont l'heure est passée de plus de dix minutes est marquée manquée et
-attend ta décision, et le fichier vidéo doit rester à sa place jusqu'à l'envoi.
-
 ## Organisation du code
 
 - `src/main/platforms/` : une plateforme par fichier, avec la même forme (`connect`, `publish`).
 - `src/main/oauth.js` : connexion par le navigateur, retour sur `127.0.0.1:8765`.
 - `src/main/assistant.js` : appel à Gemini ou à Claude ; la consigne et le schéma de réponse sont dans `src/main/lib/advice.js`.
-- `src/main/schedule.js` : publications programmées, vérifiées toutes les 20 secondes.
 - `src/main/store.js` : identifiants et jetons chiffrés.
 - `src/main/lib/` : logique sans dépendance à Electron, couverte par `test/`.
 - `src/renderer/` : l'interface.

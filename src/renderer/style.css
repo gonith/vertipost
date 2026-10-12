@@ -63,7 +63,7 @@ h2 { font-size: 15px; margin: 20px 0 8px; }
 label { display: block; margin-bottom: 12px; }
 label.inline { display: flex; align-items: center; gap: 10px; }
 
-input[type="text"], input[type="password"], input[type="datetime-local"], textarea, select {
+input[type="text"], input[type="password"], textarea, select {
   width: 100%;
   margin-top: 4px;
   padding: 8px 10px;
@@ -74,9 +74,6 @@ input[type="text"], input[type="password"], input[type="datetime-local"], textar
   font: inherit;
 }
 label.inline select, label.inline input { width: auto; margin-top: 0; }
-input[type="datetime-local"] { color-scheme: dark; }
-.schedule { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.schedule label { margin: 0; }
 textarea { resize: vertical; }
 input:focus, textarea:focus, select:focus, button:focus-visible, .drop:focus-visible {
   outline: 2px solid var(--accent);

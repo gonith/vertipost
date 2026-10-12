@@ -294,76 +294,6 @@ api.onProgress(({ id, phase, fraction }) => {
   renderProgress();
 });
 
-// Programmations.
-const JOB_STATUS = {
-  pending: 'Programmée',
-  running: 'Publication en cours...',
-  missed: "Manquée : Vertipost était fermé à l'heure prévue",
-};
-
-function jobStatus(job) {
-  if (job.status !== 'done') return JOB_STATUS[job.status];
-  return job.results.every((r) => r.ok) ? 'Publiée' : 'Terminée avec des échecs';
-}
-
-function jobCard(job) {
-  const name = (id) => (state.platforms.find((p) => p.id === id) || { name: id }).name;
-  const when = new Date(job.at).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
-  const good = job.status === 'done' && job.results.every((r) => r.ok);
-  const row = el(
-    'div',
-    { className: 'row' },
-    el('span', { className: 'name', textContent: when }),
-    el('span', { className: good ? 'good' : job.status === 'pending' || job.status === 'running' ? 'muted' : 'bad', textContent: jobStatus(job) }),
-    el('span', { className: 'grow' }),
-  );
-  const act = (label, call) => {
-    const button = el('button', { className: 'ghost', textContent: label });
-    button.addEventListener('click', async () => {
-      try {
-        renderJobs(await call(job.id));
-      } catch (e) {
-        showError(e.message);
-      }
-    });
-    row.append(button);
-  };
-  if (job.status === 'missed') act('Publier maintenant', api.scheduleRun);
-  if (job.status !== 'running') act(job.status === 'pending' ? 'Annuler' : 'Retirer', api.scheduleRemove);
-
-  const node = el(
-    'div',
-    { className: 'card' },
-    row,
-    el('p', { className: 'result muted', textContent: `${job.name} : ${job.post.title || '(sans titre)'} → ${job.targets.map(name).join(', ')}` }),
-  );
-  for (const result of job.results || []) {
-    const text = result.ok ? `${name(result.id)} : ${result.label || 'envoyé.'} ${result.url || result.note || ''}` : `${name(result.id)} : échec. ${result.error}`;
-    node.append(el('p', { className: `result ${result.ok ? 'good' : 'bad'}`, textContent: text }));
-  }
-  return node;
-}
-
-function renderJobs(jobs) {
-  $('jobs-section').hidden = jobs.length === 0;
-  $('jobs').replaceChildren(...jobs.map(jobCard));
-}
-
-$('schedule').addEventListener('click', async () => {
-  showError('');
-  if (!state.video) return showError("Choisis d'abord une vidéo.");
-  if (targets().length === 0) return showError('Coche au moins une plateforme connectée.');
-  if (!$('when').value) return showError("Choisis la date et l'heure de publication.");
-  try {
-    renderJobs(await api.scheduleAdd({ filePath: state.video.path, post: currentPost(), targets: targets(), at: new Date($('when').value).getTime() }));
-    $('when').value = '';
-  } catch (e) {
-    showError(e.message);
-  }
-});
-
-api.onSchedule(renderJobs);
-
 // Onglets.
 function showTab(name) {
   for (const tab of ['publish', 'settings']) {
@@ -572,8 +502,6 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
     renderAssistantSettings();
     renderAssistant();
     const list = await api.state();
-    state.platforms = list;
-    renderJobs(await api.scheduleList());
     state.selected = loadSelection() || new Set(list.filter((p) => p.connected).map((p) => p.id));
     setPlatforms(list);
   } catch (e) {
