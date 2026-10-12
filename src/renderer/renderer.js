@@ -248,11 +248,13 @@ drop.addEventListener('drop', async (e) => {
 });
 
 for (const id of ['title', 'caption', 'keywords']) $(id).addEventListener('input', scheduleCheck);
-$('keywords').addEventListener('input', () => {
+function setKeywords(value) {
+  $('keywords').value = value;
   try {
-    localStorage.setItem('keywords', $('keywords').value);
+    localStorage.setItem('keywords', value);
   } catch {}
-});
+}
+$('keywords').addEventListener('input', () => setKeywords($('keywords').value));
 
 // La raison n'est affichée que pour ce qui reste à faire.
 function renderScore(rules) {
@@ -316,6 +318,7 @@ function renderAdvice() {
   const apply = el('button', { id: 'apply', className: 'primary', textContent: 'Appliquer au formulaire' });
   apply.addEventListener('click', applyAdvice);
   $('advice').replaceChildren(
+    proposal('Mots-clés de niche', advice.keywords.join(', ')),
     proposal('Titre YouTube', advice.title),
     proposal('Catégorie YouTube', category.name),
     proposal('Description YouTube', advice.captions.youtube),
@@ -329,8 +332,10 @@ function renderAdvice() {
 }
 
 // La description YouTube devient la légende commune ; Instagram et X reçoivent la leur.
+// Les mots-clés proposés ne remplacent pas ceux que l'utilisateur a déjà choisis.
 function applyAdvice() {
-  const { title, categoryId, captions } = state.advice;
+  const { title, categoryId, captions, keywords } = state.advice;
+  if (!$('keywords').value.trim()) setKeywords(keywords.join(', '));
   $('title').value = title;
   $('caption').value = captions.youtube;
   setCategory(categoryId);

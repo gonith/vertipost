@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const { LIMITS } = require('./rules');
+const { TITLE_START, TITLE_MAX, CAPTION_START, HASHTAGS } = require('./score');
 
 // Catégories que YouTube accepte à l'envoi d'une vidéo. Les autres plateformes n'en ont pas :
 // leur classement se fait sur la légende et les hashtags.
@@ -34,6 +35,7 @@ const Advice = z.object({
     x: z.string(),
   }),
   tips: z.array(z.object({ title: z.string(), text: z.string() })),
+  keywords: z.array(z.string()),
 });
 
 const SYSTEM = `Tu es l'assistant de référencement de Vertipost, une application de bureau avec laquelle un créateur publie la même vidéo verticale sur YouTube Shorts, Instagram Reels, TikTok et X. Le créateur te décrit sa vidéo et te donne, s'il en a un, son brouillon de titre et de légende. Tu lui proposes un titre, une catégorie YouTube et une légende par plateforme, puis tu lui expliques tes choix : le but est qu'il comprenne les enjeux et sache faire seul la prochaine fois.
@@ -45,6 +47,8 @@ Ce que chaque plateforme attend :
 - Instagram et TikTok : pas de catégorie, tout passe par la légende et les hashtags. Sur TikTok la vidéo part en brouillon et le créateur collera lui-même la légende dans l'application.
 - X : la légende est un post, hashtags compris dans la limite de caractères ; un ou deux hashtags suffisent.
 Les limites de longueur sont données avec la demande, respecte-les.
+
+Les mots-clés de niche (keywords) sont les deux à quatre termes que le public de cette vidéo taperait ou suit déjà : le nom du jeu, son genre, son thème. Si le créateur te donne les siens, reprends-les tels quels dans keywords ; sinon propose-les à partir de sa description. L'application relit ensuite le titre et la description YouTube avec une grille fondée sur ces mots-clés, rappelée dans la demande : ta proposition doit la respecter entièrement, en comptant les caractères et les hashtags avant de répondre.
 
 Tu n'as accès à aucune donnée en direct : ni volumes de recherche, ni tendances du moment. Ne cite donc pas de chiffres, et quand un choix mérite d'être vérifié, dis où le faire (l'onglet Recherche des statistiques de YouTube Studio, TikTok Creative Center).
 
@@ -58,6 +62,12 @@ function geminiSchema(schema) {
   return Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, geminiSchema(v)]));
 }
 
+// Les mêmes seuils que la grille de l'interface, pour que la proposition la remplisse.
+const GRID = `Grille que le titre et la description YouTube doivent respecter :
+- le titre reprend un mot-clé de niche, écrit tel quel, dans ses ${TITLE_START} premiers caractères, et fait ${TITLE_MAX} caractères ou moins ;
+- la description commence par une phrase, pas par un hashtag, et reprend un mot-clé de niche, écrit tel quel, dans ses ${CAPTION_START} premiers caractères ;
+- la description compte ${HASHTAGS.min} à ${HASHTAGS.max} hashtags, dont un formé d'un mot-clé de niche écrit sans espaces.`;
+
 // `info` vient de ffprobe et peut être null.
 function adviceMessage({ brief, keywords, post, info }) {
   const draft = (label, text) => `${label} : ${(text || '').trim() || '(vide)'}`;
@@ -66,10 +76,13 @@ function adviceMessage({ brief, keywords, post, info }) {
     .join('\n');
   return [
     `Ma vidéo :\n${brief.trim()}`,
-    (keywords || '').trim() ? `Les mots-clés de ma niche : ${keywords.trim()}` : null,
+    (keywords || '').trim()
+      ? `Les mots-clés de ma niche : ${keywords.trim()}`
+      : "Je n'ai pas encore choisi les mots-clés de ma niche : propose-les.",
     info ? `Format : ${info.width}x${info.height}, ${Math.round(info.duration)} secondes.` : null,
     `Mon brouillon :\n${draft('Titre', post.title)}\n${draft('Légende', post.caption)}`,
     `Limites de longueur :\n${limits}`,
+    GRID,
     `Catégories YouTube :\n${CATEGORIES.map((c) => `- ${c.id} : ${c.name}`).join('\n')}`,
   ]
     .filter(Boolean)

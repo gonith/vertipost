@@ -33,4 +33,4 @@ function checklist({ title, caption, keywords }) {
   ];
 }
 
-module.exports = { keywordsOf, hashtagsOf, checklist };
+module.exports = { TITLE_START, TITLE_MAX, CAPTION_START, HASHTAGS, keywordsOf, hashtagsOf, checklist };

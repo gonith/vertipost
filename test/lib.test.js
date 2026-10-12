@@ -75,6 +75,9 @@ test("adviceMessage porte la description, le brouillon, les limites et les caté
   assert.match(message, /Titre : Niveau 3\nLégende : \(vide\)/);
   assert.match(message, /- x : légende 280 caractères/);
   assert.match(message, /- 20 : Jeux vidéo/);
+  assert.match(message, /pas encore choisi les mots-clés/);
+  assert.match(message, /dans ses 40 premiers caractères, et fait 60 caractères ou moins/);
+  assert.match(adviceMessage({ brief: 'x', keywords: ' roguelike ', post: {}, info: null }), /Les mots-clés de ma niche : roguelike\n/);
   assert.doesNotMatch(message, /Format :/);
   assert.equal(categoryOf('20'), '20');
   assert.equal(categoryOf('999'), '22');
