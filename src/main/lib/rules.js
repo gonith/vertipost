@@ -10,6 +10,23 @@ const LIMITS = {
 // Format exigé par Instagram pour un Reel envoyé par l'API, plus strict que les autres plateformes.
 const REEL = { megabytes: 300, codecs: ['h264', 'hevc'], fps: [23, 60], width: 1920, mbps: 25, sampleRate: 48000, seconds: 3 };
 
+// À la fin d'un envoi, Meta passe 20 à 35 secondes sur la vidéo et abandonne vers 32 secondes avec
+// un 400 « ProcessingFailedError ». Ce délai grandit avec le volume d'images (largeur x hauteur x
+// cadence x durée). Mesuré en octobre 2026 : jusqu'à 1,9 milliard de pixels l'envoi a toujours
+// abouti, au-delà de 3,5 milliards presque jamais, quels que soient le poids et le contenu du fichier.
+const REEL_PIXELS = 1.9e9;
+const LIGHT_FPS = 30;
+
+// Dimensions d'une copie qui tient sous ce volume, ou null si la vidéo y tient déjà.
+function lighterSize(info) {
+  if (!info || !info.width || !info.height || !info.duration) return null;
+  const fps = Math.min(info.fps || LIGHT_FPS, LIGHT_FPS);
+  const factor = Math.sqrt(REEL_PIXELS / (info.width * info.height * fps * info.duration));
+  if (factor >= 1 && fps === (info.fps || LIGHT_FPS)) return null;
+  // Les encodeurs veulent des dimensions paires.
+  return { width: Math.floor((info.width * Math.min(factor, 1)) / 2) * 2, fps };
+}
+
 // Chaque champ de `info` peut manquer : un contrôle sans donnée ne dit rien.
 function reelWarnings(info) {
   const out = [];
@@ -23,6 +40,8 @@ function reelWarnings(info) {
   if (info.sampleRate > REEL.sampleRate) out.push(`Audio à ${info.sampleRate} Hz : Instagram s'arrête à ${REEL.sampleRate}.`);
   if (info.channels > 2) out.push(`Audio à ${info.channels} canaux : Instagram attend du mono ou du stéréo.`);
   if (info.duration < REEL.seconds) out.push(`Durée inférieure à ${REEL.seconds} secondes, le minimum d'Instagram.`);
+  const light = lighterSize(info);
+  if (light) out.push(`Vidéo lourde pour l'envoi à Instagram, qui refuse souvent ce volume d'images. En cas de refus, Vertipost publiera une copie allégée : ${light.width} pixels de large${light.fps < info.fps ? `, ${light.fps} images par seconde` : ''}.`);
   if (info.moovFirst === false) out.push("L'index de la vidéo est en fin de fichier, ce qu'Instagram refuse : Vertipost lui enverra une copie corrigée, sans perte de qualité.");
   return out;
 }
@@ -57,4 +76,4 @@ function warnings(platform, post, info) {
   return out;
 }
 
-module.exports = { LIMITS, captionFor, warnings };
+module.exports = { LIMITS, captionFor, warnings, lighterSize };

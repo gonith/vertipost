@@ -47,6 +47,27 @@ function faststart(filePath) {
   });
 }
 
+// Copie temporaire réduite à `width` pixels de large et `fps` images par seconde, réencodée en
+// H.264 et AAC avec l'index au début. À l'appelant de supprimer la copie.
+function lighten(filePath, { width, fps }) {
+  const copy = path.join(os.tmpdir(), `vertipost-${crypto.randomUUID()}.mp4`);
+  const args = [
+    '-v', 'error', '-y', '-i', filePath,
+    '-map', '0:v:0', '-map', '0:a:0?',
+    '-vf', `scale=${width}:-2,fps=${fps}`,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+    '-movflags', '+faststart', copy,
+  ];
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', args, { windowsHide: true, timeout: 20 * 60_000 }, (error, _stdout, stderr) => {
+      if (!error) return resolve(copy);
+      fs.promises.unlink(copy).catch(() => {});
+      reject(new Error(`ffmpeg n'a pas pu alléger la vidéo : ${(stderr || error.message).trim().slice(0, 300)}`));
+    });
+  });
+}
+
 const number = (value) => (Number.isFinite(Number(value)) ? Number(value) : undefined);
 
 // « 60000/1001 » donne 59,94.
@@ -110,4 +131,4 @@ async function inspect(filePath) {
   };
 }
 
-module.exports = { inspect, faststart };
+module.exports = { inspect, faststart, lighten };

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { challenge } = require('../src/main/lib/pkce');
 const { MB, fixedChunks, tiktokPlan } = require('../src/main/lib/chunks');
-const { captionFor, warnings } = require('../src/main/lib/rules');
+const { captionFor, warnings, lighterSize } = require('../src/main/lib/rules');
 const { adviceMessage, categoryOf, geminiSchema } = require('../src/main/lib/advice');
 const { keywordsOf, checklist } = require('../src/main/lib/score');
 const { GRACE_MS, split } = require('../src/main/lib/schedule');
@@ -121,10 +121,22 @@ test('split : une programmation en retard part dans le délai toléré, sinon el
 
 test("warnings : le format d'un Reel n'est contrôlé que pour Instagram, et seulement sur les données connues", () => {
   const post = { title: 'T', caption: 'c' };
-  const good = { width: 1080, height: 1920, duration: 30, size: 50 * MB, videoCodec: 'h264', fps: 59.94, bitrate: 8e6, audioCodec: 'aac', sampleRate: 48000, channels: 2, moovFirst: true };
+  const good = { width: 1080, height: 1920, duration: 30, size: 50 * MB, videoCodec: 'h264', fps: 30, bitrate: 8e6, audioCodec: 'aac', sampleRate: 48000, channels: 2, moovFirst: true };
   assert.deepEqual(warnings('instagram', post, good), []);
   assert.deepEqual(warnings('instagram', post, { width: 1080, height: 1920, duration: 30 }), []);
   const bad = { ...good, width: 2160, height: 3840, size: 400 * MB, videoCodec: 'vp9', fps: 120, bitrate: 40e6, audioCodec: 'opus', sampleRate: 96000, channels: 6, duration: 2, moovFirst: false };
-  assert.equal(warnings('instagram', post, bad).length, 10);
+  assert.equal(warnings('instagram', post, bad).length, 11);
   assert.deepEqual(warnings('youtube', post, bad), []);
+});
+
+test('lighterSize : rien pour une vidéo courte, une largeur paire sous le volume admis sinon', () => {
+  const hd = { width: 1080, height: 1920, fps: 30 };
+  assert.equal(lighterSize({ ...hd, duration: 30 }), null);
+  assert.equal(lighterSize(null), null);
+  const long = lighterSize({ ...hd, duration: 66 });
+  assert.equal(long.width % 2, 0);
+  assert.ok(long.width >= 720 && long.width < 760, String(long.width));
+  assert.ok(long.width * (long.width * 16 / 9) * 30 * 66 <= 1.9e9);
+  // Une cadence élevée est ramenée à 30 images par seconde avant de toucher à la taille.
+  assert.deepEqual(lighterSize({ ...hd, fps: 60, duration: 20 }), { width: 1080, fps: 30 });
 });

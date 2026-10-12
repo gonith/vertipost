@@ -1,7 +1,8 @@
 const { authorize, PORT } = require('../oauth');
 const fs = require('fs');
 const { request, sendFile, sleep } = require('../lib/http');
-const { faststart } = require('../video');
+const { faststart, lighten } = require('../video');
+const { lighterSize } = require('../lib/rules');
 
 // L'envoi d'un fichier local (« resumable upload ») n'existe que derrière Facebook Login for
 // Business : le compte Instagram doit être professionnel ET rattaché à une Page Facebook.
@@ -63,40 +64,30 @@ async function publish({ tokens, video, caption, progress }) {
   const auth = { Authorization: `OAuth ${tokens.access}` };
 
   progress('Préparation', 0);
-  // Instagram refuse un fichier dont l'index est à la fin : on lui en envoie une copie réordonnée.
-  const copy = video.info && video.info.moovFirst === false ? await faststart(video.path) : null;
+  const copies = [];
+  const sized = async (file) => {
+    copies.push(file);
+    return { path: file, size: (await fs.promises.stat(file)).size };
+  };
+  const light = lighterSize(video.info);
+  let id;
+  let note = null;
   try {
-    return await upload({ tokens, auth, caption, progress, file: copy ? { path: copy, size: (await fs.promises.stat(copy)).size } : video });
-  } finally {
-    if (copy) fs.promises.unlink(copy).catch(() => {});
-  }
-}
-
-async function upload({ tokens, auth, caption, progress, file }) {
-  const container = await request(`${GRAPH}/${tokens.igUserId}/media`, {
-    headers: { Authorization: `Bearer ${tokens.access}` },
-    json: { media_type: 'REELS', upload_type: 'resumable', caption, share_to_feed: true },
-  });
-  const { id, uri } = container.data;
-  if (!id || !uri) throw new Error("Instagram n'a pas ouvert de session d'envoi.");
-
-  const sent = await sendFile(uri, {
-    method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/octet-stream', offset: '0', file_size: String(file.size) },
-    filePath: file.path,
-    start: 0,
-    end: file.size - 1,
-    onProgress: (f) => progress('Envoi', f),
-  });
-  if (sent.status >= 300 || sent.data.success === false) {
-    // La réponse de l'envoi dit rarement pourquoi : le conteneur, lui, garde le détail.
-    let detail = '';
+    // Instagram refuse un fichier dont l'index est à la fin : on lui en envoie une copie réordonnée.
+    const file = video.info && video.info.moovFirst === false ? await sized(await faststart(video.path)) : video;
     try {
-      const state = await request(`${GRAPH}/${id}?fields=status_code,status,video_status`, { headers: auth });
-      detail = ` État du conteneur : ${JSON.stringify(state.data).slice(0, 600)}`;
-    } catch {}
-    throw new Error(`L'envoi à Instagram a échoué (${sent.status}) : ${sent.text.slice(0, 600)}${detail}`);
+      id = await upload({ tokens, auth, caption, progress, file, attempts: light ? 2 : 4 });
+    } catch (e) {
+      // Un fichier refusé pour son volume d'images passe une fois allégé : voir lighterSize.
+      if (!e.flaky || !light) throw e;
+      progress('Allègement de la vidéo', 0);
+      id = await upload({ tokens, auth, caption, progress, file: await sized(await lighten(video.path, light)), attempts: 3 });
+      note = `Instagram a refusé le fichier d'origine : c'est une copie allégée (${light.width} pixels de large) qui a été publiée.`;
+    }
+  } finally {
+    for (const file of copies) fs.promises.unlink(file).catch(() => {});
   }
+
 
   // Instagram réencode la vidéo avant d'accepter la publication.
   progress('Traitement', 1);
@@ -119,7 +110,39 @@ async function upload({ tokens, auth, caption, progress, file }) {
     form: { creation_id: id },
   });
   const media = await request(`${GRAPH}/${published.data.id}?fields=permalink`, { headers: auth });
-  return { url: media.data.permalink || null, note: null };
+  return { url: media.data.permalink || null, note };
+}
+
+// Envoie le fichier dans un conteneur et rend son identifiant.
+// Meta refuse certains envois pourtant complets avec un 400 « ProcessingFailedError » qu'il dit
+// non rejouable, alors que le même fichier peut passer à l'essai suivant quand son volume
+// d'images est proche de la limite (voir lighterSize). Un conteneur refusé est perdu, chaque
+// essai en ouvre donc un neuf. L'erreur finale porte `flaky` quand c'est ce refus-là.
+async function upload({ tokens, auth, caption, progress, file, attempts }) {
+  let last;
+  let flaky = false;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const phase = attempt === 1 ? 'Envoi' : `Envoi, nouvel essai ${attempt} sur ${attempts}`;
+    const container = await request(`${GRAPH}/${tokens.igUserId}/media`, {
+      headers: { Authorization: `Bearer ${tokens.access}` },
+      json: { media_type: 'REELS', upload_type: 'resumable', caption, share_to_feed: true },
+    });
+    const { id, uri } = container.data;
+    if (!id || !uri) throw new Error("Instagram n'a pas ouvert de session d'envoi.");
+
+    last = await sendFile(uri, {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/octet-stream', offset: '0', file_size: String(file.size) },
+      filePath: file.path,
+      start: 0,
+      end: file.size - 1,
+      onProgress: (f) => progress(phase, f),
+    });
+    if (last.status < 300 && last.data.success !== false) return id;
+    flaky = Boolean(last.status === 400 && last.data.debug_info && last.data.debug_info.type === 'ProcessingFailedError');
+    if (!flaky) break;
+  }
+  throw Object.assign(new Error(`L'envoi à Instagram a échoué (${last.status}) : ${last.text.slice(0, 600)}`), { flaky });
 }
 
 module.exports = {
