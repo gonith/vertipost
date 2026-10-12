@@ -70,14 +70,20 @@ async function publish({ tokens, video, caption, progress }) {
 
   const sent = await sendFile(uri, {
     method: 'POST',
-    headers: { ...auth, offset: '0', file_size: String(video.size) },
+    headers: { ...auth, 'Content-Type': 'application/octet-stream', offset: '0', file_size: String(video.size) },
     filePath: video.path,
     start: 0,
     end: video.size - 1,
     onProgress: (f) => progress('Envoi', f),
   });
   if (sent.status >= 300 || sent.data.success === false) {
-    throw new Error(`L'envoi à Instagram a échoué (${sent.status}) : ${sent.text.slice(0, 600)}`);
+    // La réponse de l'envoi dit rarement pourquoi : le conteneur, lui, garde le détail.
+    let detail = '';
+    try {
+      const state = await request(`${GRAPH}/${id}?fields=status_code,status,video_status`, { headers: auth });
+      detail = ` État du conteneur : ${JSON.stringify(state.data).slice(0, 600)}`;
+    } catch {}
+    throw new Error(`L'envoi à Instagram a échoué (${sent.status}) : ${sent.text.slice(0, 600)}${detail}`);
   }
 
   // Instagram réencode la vidéo avant d'accepter la publication.
