@@ -21,6 +21,17 @@ body {
   font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
 }
 
+.tabs { display: flex; gap: 4px; padding: 12px 24px 0; border-bottom: 1px solid var(--line); }
+.tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); padding: 8px 14px; }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+.settings { max-width: 720px; padding: 8px 24px 24px; }
+.settings ol { padding-left: 18px; color: var(--muted); font-size: 13px; }
+.settings li { margin-bottom: 4px; }
+.settings .row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.settings #assistant-links button { margin-right: 8px; }
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+
 main {
   display: grid;
   grid-template-columns: 300px 1fr;

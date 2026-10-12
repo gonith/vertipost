@@ -364,8 +364,68 @@ $('schedule').addEventListener('click', async () => {
 
 api.onSchedule(renderJobs);
 
+// Onglets.
+function showTab(name) {
+  for (const tab of ['publish', 'settings']) {
+    $(`page-${tab}`).hidden = tab !== name;
+    $(`tab-${tab}`).classList.toggle('active', tab === name);
+  }
+}
+$('tab-publish').addEventListener('click', () => showTab('publish'));
+$('tab-settings').addEventListener('click', () => showTab('settings'));
+showTab('publish');
+
+// Paramètres de l'assistant. L'affichage et la langue sont des préférences de l'interface ;
+// l'IA choisie et les clés partent dans le stockage chiffré.
+function assistantEnabled() {
+  try {
+    return localStorage.getItem('assistant') !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+function renderAssistantSettings() {
+  const a = state.assistant;
+  $('assistant-enabled').checked = assistantEnabled();
+  $('assistant-help').replaceChildren(...a.help.map((line) => el('li', { textContent: line })));
+  $('assistant-fields').replaceChildren(...a.fields.map(fieldNode));
+  $('assistant-links').replaceChildren(
+    ...a.links.map((link) => {
+      const button = el('button', { type: 'button', className: 'ghost', textContent: link.label });
+      button.addEventListener('click', () => api.open(link.url));
+      return button;
+    }),
+  );
+}
+
+$('assistant-enabled').addEventListener('change', (e) => {
+  try {
+    localStorage.setItem('assistant', e.target.checked ? 'on' : 'off');
+  } catch {}
+  renderAssistant();
+});
+
+$('assistant-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const values = {};
+  for (const input of $('assistant-fields').querySelectorAll('input, select')) values[input.name] = input.value;
+  $('assistant-form-error').hidden = true;
+  try {
+    state.assistant = await api.saveAssistant(values);
+    renderAssistantSettings();
+    renderAssistant();
+    $('assistant-saved').hidden = false;
+    setTimeout(() => ($('assistant-saved').hidden = true), 2500);
+  } catch (err) {
+    $('assistant-form-error').textContent = err.message;
+    $('assistant-form-error').hidden = false;
+  }
+});
+
 // Assistant de référencement.
 function renderAssistant() {
+  $('assistant-block').hidden = !assistantEnabled();
   const ready = Boolean(state.assistant && state.assistant.configured);
   $('assistant-status').textContent = ready ? '' : 'Clé API à renseigner';
   $('advise').disabled = !ready;
@@ -428,7 +488,7 @@ $('language').addEventListener('change', (e) => {
     localStorage.setItem('language', e.target.value);
   } catch {}
 });
-$('assistant-configure').addEventListener('click', () => openSettings(state.assistant));
+$('assistant-configure').addEventListener('click', () => showTab('settings'));
 $('advise').addEventListener('click', async () => {
   const button = $('advise');
   const label = button.textContent;
@@ -446,35 +506,35 @@ $('advise').addEventListener('click', async () => {
   renderAssistant();
 });
 
-// Réglages d'une plateforme ou de l'assistant.
+// Champ de réglage : liste de choix, ou texte masqué quand c'est un secret.
+function fieldNode(f) {
+  if (f.options) {
+    const select = el('select', { name: f.key }, ...f.options.map((o) => el('option', { value: o.value, textContent: o.label })));
+    if (f.value) select.value = f.value;
+    return el('label', { textContent: f.label }, select);
+  }
+  return el(
+    'label',
+    { textContent: f.label },
+    el('input', {
+      type: f.secret ? 'password' : 'text',
+      name: f.key,
+      value: f.value,
+      placeholder: f.secret && f.filled ? 'Déjà enregistré, laisse vide pour le garder' : '',
+    }),
+  );
+}
+
+// Réglages d'une plateforme.
 let editing = null;
 
 function openSettings(p) {
   editing = p;
   $('settings-title').textContent = `Configurer ${p.name}`;
   $('settings-help').replaceChildren(...p.help.map((line) => el('li', { textContent: line })));
-  $('settings-redirect-label').hidden = !p.redirectUri;
-  $('settings-redirect').value = p.redirectUri || '';
+  $('settings-redirect').value = p.redirectUri;
   $('settings-error').hidden = true;
-  $('settings-fields').replaceChildren(
-    ...p.fields.map((f) => {
-      if (f.options) {
-        const select = el('select', { name: f.key }, ...f.options.map((o) => el('option', { value: o.value, textContent: o.label })));
-        if (f.value) select.value = f.value;
-        return el('label', { textContent: f.label }, select);
-      }
-      return el(
-        'label',
-        { textContent: f.label },
-        el('input', {
-          type: f.secret ? 'password' : 'text',
-          name: f.key,
-          value: f.value,
-          placeholder: f.secret && f.filled ? 'Déjà enregistré, laisse vide pour le garder' : '',
-        }),
-      );
-    }),
-  );
+  $('settings-fields').replaceChildren(...p.fields.map(fieldNode));
   $('settings').showModal();
 }
 
@@ -486,12 +546,7 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
   const values = {};
   for (const input of $('settings-fields').querySelectorAll('input, select')) values[input.name] = input.value;
   try {
-    if (editing === state.assistant) {
-      state.assistant = await api.saveAssistant(values);
-      renderAssistant();
-    } else {
-      setPlatforms(await api.saveConfig(editing.id, values));
-    }
+    setPlatforms(await api.saveConfig(editing.id, values));
     $('settings').close();
   } catch (err) {
     $('settings-error').textContent = err.message;
@@ -515,6 +570,7 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
     } catch {}
     scheduleCheck();
     state.assistant = await api.assistantState();
+    renderAssistantSettings();
     renderAssistant();
     const list = await api.state();
     state.platforms = list;

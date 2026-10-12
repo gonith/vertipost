@@ -28,8 +28,8 @@ profil de l'application, et ne quittent pas la machine.
 
 L'assistant propose un titre, une catégorie YouTube et une légende par plateforme à partir d'une
 description de la vidéo, et explique ses choix. Il appelle au choix Gemini (clé gratuite de Google
-AI Studio) ou Claude (clé Anthropic, facturée à l'usage), à régler avec le bouton **Configurer** de
-l'assistant. Il n'a pas accès à des données de recherche ou de tendances : ses propositions
+AI Studio) ou Claude (clé Anthropic, facturée à l'usage), à régler dans l'onglet **Paramètres**, où
+l'assistant peut aussi être masqué. Il n'a pas accès à des données de recherche ou de tendances : ses propositions
 reposent sur les règles générales du format court.
 
 La grille **Pertinence** fonctionne sans IA : elle coche, à partir de tes mots-clés de niche, les

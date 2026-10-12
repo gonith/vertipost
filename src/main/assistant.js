@@ -92,10 +92,8 @@ async function advise(config, input) {
   return { ...advice, categoryId: categoryOf(advice.categoryId) };
 }
 
-// Même forme que les réglages d'une plateforme, pour réutiliser la même fenêtre.
+// Les champs ont la même forme que ceux d'une plateforme, pour partager leur affichage.
 const settings = {
-  id: 'assistant',
-  name: "l'assistant",
   fields: [
     {
       key: 'provider',
@@ -108,10 +106,13 @@ const settings = {
     { key: 'geminiKey', label: 'Clé API Gemini', secret: true, optional: true },
     { key: 'anthropicKey', label: 'Clé API Anthropic', secret: true, optional: true },
   ],
-  consoleUrl: 'https://aistudio.google.com/apikey',
+  links: [
+    { label: 'Créer une clé Gemini', url: 'https://aistudio.google.com/apikey' },
+    { label: 'Créer une clé Claude', url: 'https://platform.claude.com/settings/keys' },
+  ],
   help: [
     "L'assistant propose un titre, une catégorie YouTube et une légende par plateforme, et explique ses choix. Il lui faut la clé API de l'IA choisie ; l'autre peut rester vide.",
-    'Gemini : crée une clé gratuite sur Google AI Studio (bouton ci-dessous). Le nombre de demandes par jour est limité, et Google utilise le contenu des demandes gratuites pour améliorer ses produits.',
+    'Gemini : crée une clé gratuite sur Google AI Studio. Le nombre de demandes par jour est limité, et Google utilise le contenu des demandes gratuites pour améliorer ses produits.',
     'Claude : crée une clé sur platform.claude.com après y avoir ajouté des crédits prépayés. Chaque proposition est facturée à l\'usage.',
     "La description de ta vidéo, tes mots-clés, ton titre et ta légende sont envoyés à l'IA choisie ; la vidéo elle-même ne l'est pas.",
   ],
