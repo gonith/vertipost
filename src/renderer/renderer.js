@@ -353,6 +353,11 @@ function setCategory(id) {
 }
 
 $('category').addEventListener('change', (e) => setCategory(e.target.value));
+$('language').addEventListener('change', (e) => {
+  try {
+    localStorage.setItem('language', e.target.value);
+  } catch {}
+});
 $('assistant-configure').addEventListener('click', () => openSettings(state.assistant));
 $('advise').addEventListener('click', async () => {
   const button = $('advise');
@@ -361,7 +366,7 @@ $('advise').addEventListener('click', async () => {
   button.disabled = true;
   button.textContent = 'Réflexion en cours...';
   try {
-    state.advice = await api.advise({ brief: $('brief').value, keywords: $('keywords').value, post: currentPost(), info: state.video && state.video.info });
+    state.advice = await api.advise({ brief: $('brief').value, keywords: $('keywords').value, language: $('language').value, post: currentPost(), info: state.video && state.video.info });
     renderAdvice();
   } catch (e) {
     $('assistant-error').textContent = e.message;
@@ -436,6 +441,7 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
     $('category').value = categories.list.some((c) => c.id === category) ? category : categories.initial;
     try {
       $('keywords').value = localStorage.getItem('keywords') || '';
+      $('language').value = localStorage.getItem('language') || '';
     } catch {}
     scheduleCheck();
     state.assistant = await api.assistantState();

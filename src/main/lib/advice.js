@@ -68,8 +68,11 @@ const GRID = `Grille que le titre et la description YouTube doivent respecter :
 - la description commence par une phrase, pas par un hashtag, et reprend un mot-clé de niche, écrit tel quel, dans ses ${CAPTION_START} premiers caractères ;
 - la description compte ${HASHTAGS.min} à ${HASHTAGS.max} hashtags, dont un formé d'un mot-clé de niche écrit sans espaces.`;
 
+// Sans langue choisie, la consigne générale s'applique : celle de la description.
+const LANGUAGES = { fr: 'français', en: 'anglais' };
+
 // `info` vient de ffprobe et peut être null.
-function adviceMessage({ brief, keywords, post, info }) {
+function adviceMessage({ brief, keywords, language, post, info }) {
   const draft = (label, text) => `${label} : ${(text || '').trim() || '(vide)'}`;
   const limits = Object.entries(LIMITS)
     .map(([id, l]) => `- ${id} : ${l.title ? `titre ${l.title} caractères, ` : ''}légende ${l.caption} caractères`)
@@ -79,6 +82,9 @@ function adviceMessage({ brief, keywords, post, info }) {
     (keywords || '').trim()
       ? `Les mots-clés de ma niche : ${keywords.trim()}`
       : "Je n'ai pas encore choisi les mots-clés de ma niche : propose-les.",
+    LANGUAGES[language]
+      ? `Écris le titre, les légendes et les hashtags en ${LANGUAGES[language]}, même si ma description est dans une autre langue. Les mots-clés que tu proposes sont dans cette langue aussi.`
+      : null,
     info ? `Format : ${info.width}x${info.height}, ${Math.round(info.duration)} secondes.` : null,
     `Mon brouillon :\n${draft('Titre', post.title)}\n${draft('Légende', post.caption)}`,
     `Limites de longueur :\n${limits}`,
