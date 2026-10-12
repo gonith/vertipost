@@ -1,5 +1,7 @@
 const { authorize, PORT } = require('../oauth');
+const fs = require('fs');
 const { request, sendFile, sleep } = require('../lib/http');
+const { faststart } = require('../video');
 
 // L'envoi d'un fichier local (« resumable upload ») n'existe que derrière Facebook Login for
 // Business : le compte Instagram doit être professionnel ET rattaché à une Page Facebook.
@@ -61,6 +63,16 @@ async function publish({ tokens, video, caption, progress }) {
   const auth = { Authorization: `OAuth ${tokens.access}` };
 
   progress('Préparation', 0);
+  // Instagram refuse un fichier dont l'index est à la fin : on lui en envoie une copie réordonnée.
+  const copy = video.info && video.info.moovFirst === false ? await faststart(video.path) : null;
+  try {
+    return await upload({ tokens, auth, caption, progress, file: copy ? { path: copy, size: (await fs.promises.stat(copy)).size } : video });
+  } finally {
+    if (copy) fs.promises.unlink(copy).catch(() => {});
+  }
+}
+
+async function upload({ tokens, auth, caption, progress, file }) {
   const container = await request(`${GRAPH}/${tokens.igUserId}/media`, {
     headers: { Authorization: `Bearer ${tokens.access}` },
     json: { media_type: 'REELS', upload_type: 'resumable', caption, share_to_feed: true },
@@ -70,10 +82,10 @@ async function publish({ tokens, video, caption, progress }) {
 
   const sent = await sendFile(uri, {
     method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/octet-stream', offset: '0', file_size: String(video.size) },
-    filePath: video.path,
+    headers: { ...auth, 'Content-Type': 'application/octet-stream', offset: '0', file_size: String(file.size) },
+    filePath: file.path,
     start: 0,
-    end: video.size - 1,
+    end: file.size - 1,
     onProgress: (f) => progress('Envoi', f),
   });
   if (sent.status >= 300 || sent.data.success === false) {

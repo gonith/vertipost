@@ -1,5 +1,7 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { pathToFileURL } = require('url');
 
@@ -29,6 +31,20 @@ async function moovFirst(filePath) {
   } finally {
     if (handle) await handle.close();
   }
+}
+
+// Copie temporaire de la vidéo avec l'index au début. Les images et le son sont recopiés tels
+// quels, sans réencodage : c'est rapide et sans perte. À l'appelant de supprimer la copie.
+function faststart(filePath) {
+  const copy = path.join(os.tmpdir(), `vertipost-${crypto.randomUUID()}.mp4`);
+  const args = ['-v', 'error', '-y', '-i', filePath, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', '-movflags', '+faststart', copy];
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', args, { windowsHide: true, timeout: 5 * 60_000 }, (error, _stdout, stderr) => {
+      if (!error) return resolve(copy);
+      fs.promises.unlink(copy).catch(() => {});
+      reject(new Error(`La vidéo a son index en fin de fichier et ffmpeg n'a pas pu la corriger : ${(stderr || error.message).trim().slice(0, 300)}`));
+    });
+  });
 }
 
 const number = (value) => (Number.isFinite(Number(value)) ? Number(value) : undefined);
@@ -94,4 +110,4 @@ async function inspect(filePath) {
   };
 }
 
-module.exports = { inspect };
+module.exports = { inspect, faststart };

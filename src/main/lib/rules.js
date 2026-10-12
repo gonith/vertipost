@@ -23,7 +23,7 @@ function reelWarnings(info) {
   if (info.sampleRate > REEL.sampleRate) out.push(`Audio à ${info.sampleRate} Hz : Instagram s'arrête à ${REEL.sampleRate}.`);
   if (info.channels > 2) out.push(`Audio à ${info.channels} canaux : Instagram attend du mono ou du stéréo.`);
   if (info.duration < REEL.seconds) out.push(`Durée inférieure à ${REEL.seconds} secondes, le minimum d'Instagram.`);
-  if (info.moovFirst === false) out.push("L'index de la vidéo est en fin de fichier : Instagram le veut au début (option « fast start » ou « optimisé pour le web » à l'export).");
+  if (info.moovFirst === false) out.push("L'index de la vidéo est en fin de fichier, ce qu'Instagram refuse : Vertipost lui enverra une copie corrigée, sans perte de qualité.");
   return out;
 }
 
