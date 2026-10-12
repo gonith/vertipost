@@ -63,6 +63,7 @@ function setPlatforms(list) {
 }
 
 function statusText(p) {
+  if (p.assisted) return 'Mode assisté';
   if (p.connected) return `Connecté : ${p.account}`;
   return p.configured ? 'Non connecté' : 'À configurer';
 }
@@ -80,7 +81,7 @@ function card(p) {
   const configure = el('button', { className: 'ghost', textContent: 'Configurer', disabled: state.busy });
   configure.addEventListener('click', () => openSettings(p));
 
-  const link = el('button', { textContent: p.connected ? 'Déconnecter' : 'Connecter', disabled: state.busy || !p.configured });
+  const link = el('button', { textContent: p.connected && !p.assisted ? 'Déconnecter' : 'Connecter', disabled: state.busy || !p.configured || p.assisted });
   link.addEventListener('click', async () => {
     showError('');
     link.disabled = true;
@@ -111,8 +112,7 @@ function card(p) {
     ),
   );
 
-  // TikTok part en brouillon : la légende s'écrit dans l'application, pas ici.
-  if (p.connected && p.id !== 'tiktok') {
+  if (p.connected) {
     const own = el('textarea', { rows: 3, value: state.overrides[p.id] || '', placeholder: 'Vide : la légende commune est utilisée.' });
     own.addEventListener('input', () => {
       state.overrides[p.id] = own.value;
@@ -130,7 +130,7 @@ function card(p) {
 
   const result = state.results[p.id];
   if (result) {
-    const line = el('p', { className: `result ${result.ok ? 'good' : 'bad'}`, textContent: result.ok ? 'Envoyé.' : `Échec : ${result.error}` });
+    const line = el('p', { className: `result ${result.ok ? 'good' : 'bad'}`, textContent: result.ok ? result.label || 'Envoyé.' : `Échec : ${result.error}` });
     if (result.url) {
       const open = el('button', { textContent: 'Ouvrir' });
       open.addEventListener('click', () => api.open(result.url));
@@ -338,7 +338,7 @@ function jobCard(job) {
     el('p', { className: 'result muted', textContent: `${job.name} : ${job.post.title || '(sans titre)'} → ${job.targets.map(name).join(', ')}` }),
   );
   for (const result of job.results || []) {
-    const text = result.ok ? `${name(result.id)} : envoyé. ${result.url || result.note || ''}` : `${name(result.id)} : échec. ${result.error}`;
+    const text = result.ok ? `${name(result.id)} : ${result.label || 'envoyé.'} ${result.url || result.note || ''}` : `${name(result.id)} : échec. ${result.error}`;
     node.append(el('p', { className: `result ${result.ok ? 'good' : 'bad'}`, textContent: text }));
   }
   return node;
@@ -453,7 +453,7 @@ function renderAdvice() {
     proposal('Catégorie YouTube', category.name),
     proposal('Description YouTube', advice.captions.youtube),
     proposal('Légende Instagram', advice.captions.instagram),
-    proposal("Légende TikTok, à coller dans l'application TikTok", advice.captions.tiktok),
+    proposal('Légende TikTok', advice.captions.tiktok),
     proposal('Post X', advice.captions.x),
     apply,
     el('h3', { textContent: 'Pourquoi ces choix' }),
@@ -461,7 +461,7 @@ function renderAdvice() {
   );
 }
 
-// La description YouTube devient la légende commune ; Instagram et X reçoivent la leur.
+// La description YouTube devient la légende commune ; Instagram, TikTok et X reçoivent la leur.
 // Les mots-clés proposés ne remplacent pas ceux que l'utilisateur a déjà choisis.
 function applyAdvice() {
   const { title, categoryId, captions, keywords } = state.advice;
@@ -470,6 +470,7 @@ function applyAdvice() {
   $('caption').value = captions.youtube;
   setCategory(categoryId);
   state.overrides.instagram = captions.instagram;
+  state.overrides.tiktok = captions.tiktok;
   state.overrides.x = captions.x;
   scheduleCheck();
   render();

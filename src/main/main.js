@@ -43,7 +43,9 @@ function describe() {
         filled: Boolean(config[f.key]),
       })),
       configured: p.fields.every((f) => f.optional || config[f.key]),
-      connected: Boolean(saved.tokens),
+      // Un mode assisté n'a pas de compte à connecter : la plateforme est prête telle quelle.
+      assisted: Boolean(p.assisted && p.assisted(config)),
+      connected: Boolean(saved.tokens) || Boolean(p.assisted && p.assisted(config)),
       account: saved.account || null,
     };
   });
@@ -107,9 +109,10 @@ async function publish(notify, { filePath, post, targets }) {
   const one = async (id) => {
     const p = platform(id);
     const saved = data[id] || {};
-    if (!saved.tokens) throw new Error('Compte non connecté.');
+    const config = saved.config || {};
+    if (!saved.tokens && !(p.assisted && p.assisted(config))) throw new Error('Compte non connecté.');
     return p.publish({
-      config: saved.config,
+      config,
       tokens: saved.tokens,
       saveTokens: (tokens) => store.update(id, { tokens }),
       video,

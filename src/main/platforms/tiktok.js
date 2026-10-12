@@ -1,3 +1,4 @@
+const { clipboard, shell } = require('electron');
 const { authorize, PORT } = require('../oauth');
 const { request, sendFile, sleep } = require('../lib/http');
 const { tiktokPlan } = require('../lib/chunks');
@@ -22,15 +23,36 @@ const toTokens = (data, mode) => ({
   mode,
 });
 
-// Deux façons d'envoyer, chacune avec son autorisation :
-// - draft : la vidéo arrive en brouillon dans la boîte de réception TikTok du compte ;
-// - private : elle est publiée directement, visible de son auteur seul. Tant que l'application
-//   n'est pas auditée par TikTok, c'est la seule visibilité que la publication directe accepte.
+// Trois façons d'envoyer :
+// - assisted : Vertipost prépare tout et l'utilisateur termine sur le site de TikTok. C'est le
+//   mode par défaut, parce que TikTok refuse d'auditer un outil d'envoi à usage personnel et que
+//   les deux modes par API restent bridés sans audit ;
+// - draft : par l'API, la vidéo arrive en brouillon dans la boîte de réception TikTok du compte.
+//   En Sandbox, TikTok confirme le dépôt mais la notification n'apparaît pas dans l'application ;
+// - private : par l'API, publication directe visible de son auteur seul, et seulement si le
+//   compte est privé au moment de l'envoi.
+// Les deux modes par API ont chacun leur autorisation.
 const MODES = {
+  assisted: {},
   draft: { scope: 'user.info.basic,video.upload', init: '/post/publish/inbox/video/init/' },
   private: { scope: 'user.info.basic,video.publish', init: '/post/publish/video/init/' },
 };
-const modeOf = (config) => (MODES[config.mode] ? config.mode : 'draft');
+const modeOf = (config) => (MODES[config.mode] ? config.mode : 'assisted');
+const assisted = (config) => modeOf(config) === 'assisted';
+const STUDIO = 'https://www.tiktok.com/tiktokstudio/upload';
+
+// Rien n'est envoyé : la légende va dans le presse-papiers, le fichier est montré dans
+// l'Explorateur et la page d'envoi de TikTok s'ouvre dans le navigateur.
+async function assist({ video, caption }) {
+  clipboard.writeText(caption);
+  shell.showItemInFolder(video.path);
+  await shell.openExternal(STUDIO);
+  return {
+    url: null,
+    label: 'À terminer dans TikTok.',
+    note: "La page d'envoi de TikTok est ouverte, ta vidéo est affichée dans l'Explorateur et la légende est copiée : glisse la vidéo dans la page, colle la légende (Ctrl+V) et publie.",
+  };
+}
 
 async function call(path, access, json) {
   const { data } = await request(`${API}${path}`, { headers: { Authorization: `Bearer ${access}` }, json });
@@ -41,6 +63,8 @@ async function call(path, access, json) {
 }
 
 async function connect(config) {
+  if (assisted(config)) throw new Error("Le mode assisté n'a pas besoin de connexion.");
+  if (!config.clientId || !config.clientSecret) throw new Error("Ce mode d'envoi demande le Client key et le Client secret.");
   const { code, verifier } = await authorize({
     authUrl: 'https://www.tiktok.com/v2/auth/authorize/',
     params: { client_key: config.clientId, response_type: 'code', scope: MODES[modeOf(config)].scope },
@@ -104,9 +128,10 @@ async function putChunk(url, video, chunk, onProgress) {
 async function publish(ctx) {
   const { config, tokens, video, caption, progress } = ctx;
   const mode = modeOf(config);
+  if (mode === 'assisted') return assist(ctx);
   // L'autorisation obtenue à la connexion ne vaut que pour un mode. Une connexion d'avant
   // l'existence des modes est un brouillon.
-  if ((tokens.mode || 'draft') !== mode) {
+  if (!tokens || (tokens.mode || 'draft') !== mode) {
     throw new Error("Le mode d'envoi a changé depuis la connexion : déconnecte puis reconnecte le compte TikTok.");
   }
   const access = await accessToken(ctx);
@@ -157,26 +182,28 @@ module.exports = {
   name: 'TikTok',
   redirectUri: REDIRECT,
   fields: [
-    { key: 'clientId', label: 'Client key' },
-    { key: 'clientSecret', label: 'Client secret', secret: true },
     {
       key: 'mode',
       label: "Mode d'envoi",
       optional: true,
       options: [
-        { value: 'draft', label: 'Brouillon dans la boîte de réception TikTok' },
-        { value: 'private', label: 'Publication directe, en privé' },
+        { value: 'assisted', label: 'Assisté : tu termines sur le site de TikTok' },
+        { value: 'draft', label: 'API : brouillon dans la boîte de réception TikTok' },
+        { value: 'private', label: 'API : publication directe, en privé' },
       ],
     },
+    { key: 'clientId', label: 'Client key (modes API seulement)', optional: true },
+    { key: 'clientSecret', label: 'Client secret (modes API seulement)', secret: true, optional: true },
   ],
   consoleUrl: 'https://developers.tiktok.com/apps/',
   help: [
-    'Crée une application sur TikTok for Developers, plateforme « Desktop », et travaille dans son Sandbox avec ton compte en « Target user ».',
-    'Ajoute les produits « Login Kit » et « Content Posting API ».',
-    'Mode brouillon (scope « video.upload ») : tu reçois une notification dans TikTok, tu y colles la légende et tu publies. 5 brouillons en attente au maximum par 24 heures.',
-    "Mode publication directe (active « Direct Post » dans Content Posting API, scope « video.publish ») : la vidéo est publiée avec sa légende, visible de toi seul tant que TikTok n'a pas audité l'application ; tu changes sa visibilité dans TikTok.",
-    "Après un changement de mode, déconnecte puis reconnecte le compte : l'autorisation n'est pas la même.",
+    "Mode assisté, sans rien configurer : à la publication, Vertipost ouvre la page d'envoi de TikTok, affiche ta vidéo dans l'Explorateur et copie la légende. Tu glisses la vidéo, tu colles la légende et tu publies.",
+    "Les modes API demandent une application TikTok for Developers (plateforme « Desktop », produits « Login Kit » et « Content Posting API », ton compte en « Target user » du Sandbox). TikTok ne valide pas un outil à usage personnel, et sans validation ils restent bridés.",
+    'API, brouillon (scope « video.upload ») : TikTok confirme le dépôt, mais en Sandbox la notification peut ne jamais arriver dans son application.',
+    "API, publication directe (option « Direct Post », scope « video.publish ») : ton compte TikTok doit être privé au moment de l'envoi et la vidéo n'est visible que de toi.",
+    "Après un changement de mode API, déconnecte puis reconnecte le compte : l'autorisation n'est pas la même.",
   ],
+  assisted,
   connect,
   publish,
 };
