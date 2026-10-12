@@ -27,15 +27,19 @@ profil de l'application, et ne quittent pas la machine.
 ## Assistant de référencement
 
 L'assistant propose un titre, une catégorie YouTube et une légende par plateforme à partir d'une
-description de la vidéo, et explique ses choix. Il appelle Claude avec ta propre clé API Anthropic
-(bouton **Configurer** de l'assistant), facturée à l'usage. Il n'a pas accès à des données de
-recherche ou de tendances : ses propositions reposent sur les règles générales du format court.
+description de la vidéo, et explique ses choix. Il appelle au choix Gemini (clé gratuite de Google
+AI Studio) ou Claude (clé Anthropic, facturée à l'usage), à régler avec le bouton **Configurer** de
+l'assistant. Il n'a pas accès à des données de recherche ou de tendances : ses propositions
+reposent sur les règles générales du format court.
+
+La grille **Pertinence** fonctionne sans IA : elle coche, à partir de tes mots-clés de niche, les
+bonnes pratiques que ton titre et ta légende respectent (`src/main/lib/score.js`).
 
 ## Organisation du code
 
 - `src/main/platforms/` : une plateforme par fichier, avec la même forme (`connect`, `publish`).
 - `src/main/oauth.js` : connexion par le navigateur, retour sur `127.0.0.1:8765`.
-- `src/main/assistant.js` : appel à Claude ; la consigne et le schéma de réponse sont dans `src/main/lib/advice.js`.
+- `src/main/assistant.js` : appel à Gemini ou à Claude ; la consigne et le schéma de réponse sont dans `src/main/lib/advice.js`.
 - `src/main/store.js` : identifiants et jetons chiffrés.
 - `src/main/lib/` : logique sans dépendance à Electron, couverte par `test/`.
 - `src/renderer/` : l'interface.

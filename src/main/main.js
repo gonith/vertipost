@@ -7,6 +7,7 @@ const { inspect } = require('./video');
 const { warnings, captionFor } = require('./lib/rules');
 const { CATEGORIES, DEFAULT_CATEGORY } = require('./lib/advice');
 const assistant = require('./assistant');
+const { checklist } = require('./lib/score');
 
 // Node ne lit pas le magasin de certificats de Windows. Sur un poste où un antivirus
 // re-signe le HTTPS (Avast, Kaspersky...), toutes les requêtes échoueraient en
@@ -60,21 +61,35 @@ function saveConfig(id, values) {
   store.update(id, sameApp ? { config } : { config, tokens: null, account: null });
 }
 
+const assistantConfig = () => (store.load().assistant || {}).config || {};
+
 function describeAssistant() {
-  const config = (store.load().assistant || {}).config || {};
-  const filled = Boolean(config.apiKey);
+  const config = assistantConfig();
   return {
     ...assistant.settings,
-    fields: assistant.settings.fields.map((f) => ({ ...f, value: '', filled })),
-    configured: filled,
+    fields: assistant.settings.fields.map((f) => ({
+      ...f,
+      value: f.secret ? '' : config[f.key] || '',
+      filled: Boolean(config[f.key]),
+    })),
+    configured: assistant.configured(config),
   };
 }
 
+function saveAssistant(values) {
+  const config = { ...assistantConfig() };
+  for (const field of assistant.settings.fields) {
+    const value = (values[field.key] || '').trim();
+    if (value || !field.secret) config[field.key] = value;
+  }
+  store.update('assistant', { config });
+}
+
 async function advise(input) {
-  const config = (store.load().assistant || {}).config || {};
-  if (!config.apiKey) throw new Error("Renseigne d'abord la clé API de l'assistant.");
+  const config = assistantConfig();
+  if (!assistant.configured(config)) throw new Error("Renseigne d'abord la clé API de l'assistant.");
   if (!(input.brief || '').trim()) throw new Error("Décris d'abord ta vidéo.");
-  return assistant.advise(config.apiKey, input);
+  return assistant.advise(config, input);
 }
 
 async function connect(id) {
@@ -150,11 +165,11 @@ handle('check', (_e, post, info) =>
   Object.fromEntries(platforms.map((p) => [p.id, warnings(p.id, post, info)])),
 );
 handle('publish', (event, request) => publish(event.sender, request));
+handle('score', (_e, post, keywords) => checklist({ title: post.title, caption: post.caption, keywords }));
 handle('categories', () => ({ list: CATEGORIES, initial: DEFAULT_CATEGORY }));
 handle('assistant:state', () => describeAssistant());
 handle('assistant:save', (_e, values) => {
-  const apiKey = (values.apiKey || '').trim();
-  if (apiKey) store.update('assistant', { config: { apiKey } });
+  saveAssistant(values);
   return describeAssistant();
 });
 handle('assistant:advise', (_e, input) => advise(input));

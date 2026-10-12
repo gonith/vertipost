@@ -1,24 +1,27 @@
+const { z } = require('zod');
 const { Anthropic } = require('@anthropic-ai/sdk');
 const { betaZodOutputFormat } = require('@anthropic-ai/sdk/helpers/beta/zod');
-const { Advice, SYSTEM, adviceMessage, categoryOf } = require('./lib/advice');
+const { request } = require('./lib/http');
+const { Advice, SYSTEM, adviceMessage, categoryOf, geminiSchema } = require('./lib/advice');
 
-const MODEL = 'claude-opus-5-5';
+const CLAUDE_MODEL = 'claude-opus-5-5';
+const GEMINI_MODEL = 'gemini-3.8-flash';
 
 function explain(error) {
-  if (error instanceof Anthropic.AuthenticationError) return 'Clé API refusée par Anthropic : vérifie-la dans les réglages de l\'assistant.';
-  if (error instanceof Anthropic.PermissionDeniedError) return `Cette clé API n'a pas accès au modèle ${MODEL}.`;
+  if (error instanceof Anthropic.AuthenticationError) return "Clé API refusée par Anthropic : vérifie-la dans les réglages de l'assistant.";
+  if (error instanceof Anthropic.PermissionDeniedError) return `Cette clé API n'a pas accès au modèle ${CLAUDE_MODEL}.`;
   if (error instanceof Anthropic.RateLimitError) return 'Trop de demandes ou crédits épuisés chez Anthropic : réessaie dans un moment.';
-  if (error instanceof Anthropic.APIConnectionError) return "Impossible de joindre Anthropic : vérifie la connexion Internet.";
+  if (error instanceof Anthropic.APIConnectionError) return 'Impossible de joindre Anthropic : vérifie la connexion Internet.';
   if (error instanceof Anthropic.APIError) return `Anthropic a répondu ${error.status} : ${error.message.slice(0, 600)}`;
   return error.message;
 }
 
-async function advise(apiKey, input) {
+async function claude(apiKey, input) {
   const client = new Anthropic({ apiKey });
   let response;
   try {
     response = await client.beta.messages.parse({
-      model: MODEL,
+      model: CLAUDE_MODEL,
       max_tokens: 16000,
       // Si le modèle décline la demande, Anthropic la rejoue sur son modèle de repli.
       betas: ['server-side-fallback-2026-07-01'],
@@ -32,21 +35,76 @@ async function advise(apiKey, input) {
   }
   if (response.stop_reason === 'refusal') throw new Error("L'assistant a décliné cette demande. Reformule la description de la vidéo.");
   if (!response.parsed_output) throw new Error("La réponse de l'assistant est incomplète. Réessaie.");
-  // Le schéma ne peut pas borner la catégorie à la liste : une valeur inconnue retombe sur celle par défaut.
-  return { ...response.parsed_output, categoryId: categoryOf(response.parsed_output.categoryId) };
+  return response.parsed_output;
+}
+
+async function gemini(apiKey, input) {
+  const { data } = await request(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      headers: { 'x-goog-api-key': apiKey },
+      json: {
+        systemInstruction: { parts: [{ text: SYSTEM }] },
+        contents: [{ role: 'user', parts: [{ text: adviceMessage(input) }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(z.toJSONSchema(Advice)) },
+      },
+    },
+  );
+  const candidate = (data.candidates || [])[0];
+  if (!candidate) {
+    const reason = data.promptFeedback && data.promptFeedback.blockReason;
+    throw new Error(`Gemini n'a rien répondu${reason ? ` (${reason})` : ''}. Reformule la description de la vidéo.`);
+  }
+  // Les passages de réflexion du modèle arrivent dans la même liste, marqués `thought`.
+  const text = ((candidate.content && candidate.content.parts) || [])
+    .filter((p) => p.text && !p.thought)
+    .map((p) => p.text)
+    .join('');
+  try {
+    return Advice.parse(JSON.parse(text));
+  } catch {
+    throw new Error(`La réponse de Gemini est incomplète (${candidate.finishReason || 'raison inconnue'}). Réessaie.`);
+  }
+}
+
+const PROVIDERS = {
+  gemini: { key: 'geminiKey', run: gemini },
+  claude: { key: 'anthropicKey', run: claude },
+};
+
+const providerOf = (config) => PROVIDERS[config.provider] || PROVIDERS.gemini;
+const configured = (config) => Boolean(config[providerOf(config).key]);
+
+async function advise(config, input) {
+  const provider = providerOf(config);
+  const advice = await provider.run(config[provider.key], input);
+  // Aucun des deux schémas ne borne la catégorie à la liste : une valeur inconnue retombe sur celle par défaut.
+  return { ...advice, categoryId: categoryOf(advice.categoryId) };
 }
 
 // Même forme que les réglages d'une plateforme, pour réutiliser la même fenêtre.
 const settings = {
   id: 'assistant',
   name: "l'assistant",
-  fields: [{ key: 'apiKey', label: 'Clé API Anthropic', secret: true }],
-  consoleUrl: 'https://platform.claude.com/settings/keys',
+  fields: [
+    {
+      key: 'provider',
+      label: 'IA utilisée',
+      options: [
+        { value: 'gemini', label: 'Gemini (Google), gratuit' },
+        { value: 'claude', label: 'Claude (Anthropic), payant' },
+      ],
+    },
+    { key: 'geminiKey', label: 'Clé API Gemini', secret: true, optional: true },
+    { key: 'anthropicKey', label: 'Clé API Anthropic', secret: true, optional: true },
+  ],
+  consoleUrl: 'https://aistudio.google.com/apikey',
   help: [
-    "L'assistant propose un titre, une catégorie YouTube et une légende par plateforme, et explique ses choix. Il s'appuie sur Claude, le modèle d'Anthropic.",
-    'Crée un compte sur la console Anthropic, ajoute des crédits prépayés, puis génère une clé API.',
-    "Chaque proposition est facturée à l'usage sur ces crédits. La description de ta vidéo, ton titre et ta légende sont envoyés à Anthropic ; la vidéo elle-même ne l'est pas.",
+    "L'assistant propose un titre, une catégorie YouTube et une légende par plateforme, et explique ses choix. Il lui faut la clé API de l'IA choisie ; l'autre peut rester vide.",
+    'Gemini : crée une clé gratuite sur Google AI Studio (bouton ci-dessous). Le nombre de demandes par jour est limité, et Google utilise le contenu des demandes gratuites pour améliorer ses produits.',
+    'Claude : crée une clé sur platform.claude.com après y avoir ajouté des crédits prépayés. Chaque proposition est facturée à l\'usage.',
+    "La description de ta vidéo, tes mots-clés, ton titre et ta légende sont envoyés à l'IA choisie ; la vidéo elle-même ne l'est pas.",
   ],
 };
 
-module.exports = { advise, settings };
+module.exports = { advise, configured, settings };

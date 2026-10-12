@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const { challenge } = require('../src/main/lib/pkce');
 const { MB, fixedChunks, tiktokPlan } = require('../src/main/lib/chunks');
 const { captionFor, warnings } = require('../src/main/lib/rules');
-const { adviceMessage, categoryOf } = require('../src/main/lib/advice');
+const { adviceMessage, categoryOf, geminiSchema } = require('../src/main/lib/advice');
+const { keywordsOf, checklist } = require('../src/main/lib/score');
 
 test('challenge PKCE : vecteur de la RFC 7636 en base64url, même condensat en hex pour TikTok', () => {
   const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
@@ -78,4 +79,27 @@ test("adviceMessage porte la description, le brouillon, les limites et les caté
   assert.equal(categoryOf('20'), '20');
   assert.equal(categoryOf('999'), '22');
   assert.equal(categoryOf(undefined), '22');
+});
+
+test('geminiSchema retire $schema et additionalProperties à tous les niveaux', () => {
+  const schema = { $schema: 'x', type: 'object', additionalProperties: false, properties: { a: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['b'] } } } };
+  assert.deepEqual(geminiSchema(schema), { type: 'object', properties: { a: { type: 'array', items: { type: 'object', required: ['b'] } } } });
+});
+
+test('checklist : tout est coché sur un texte conforme, sans casse ni accents', () => {
+  assert.deepEqual(keywordsOf(' Bomb Arena, Jeu Indé ,,bomb arena'), ['bomb arena', 'jeu inde']);
+  const rules = checklist({
+    title: 'Bomb Arena : le combo impossible',
+    caption: 'Un combo jamais vu dans ce jeu indé.\n#BombArena #jeuindé #gaming',
+    keywords: 'Bomb Arena, jeu indé',
+  });
+  assert.deepEqual(rules.filter((r) => !r.ok).map((r) => r.label), []);
+});
+
+test('checklist : signale chaque manque', () => {
+  const failed = (input) => checklist(input).filter((r) => !r.ok).length;
+  assert.equal(failed({ title: '', caption: '', keywords: '' }), 8);
+  const long = `${'x'.repeat(50)} bomb arena ${'x'.repeat(20)}`;
+  const rules = checklist({ title: long, caption: '#bombarena en premier', keywords: 'bomb arena' });
+  assert.deepEqual(rules.map((r) => r.ok), [true, true, false, false, false, false, false, true]);
 });

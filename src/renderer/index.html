@@ -39,6 +39,15 @@
       <label>Légende <span class="muted">(toutes les plateformes, hashtags compris)</span>
         <textarea id="caption" rows="4" placeholder="Ta légende #shorts"></textarea>
       </label>
+      <label>Mots-clés de ta niche <span class="muted">(séparés par des virgules : le nom du jeu, son genre...)</span>
+        <input id="keywords" type="text" placeholder="mon jeu, roguelike, jeu indé">
+      </label>
+      <div id="score" class="score">
+        <p><span class="name">Pertinence</span> <span id="score-total" class="muted"></span></p>
+        <ul id="score-list"></ul>
+        <p class="muted">Repères de bonnes pratiques, calculés sur le titre et la légende commune. Ce n'est pas une prédiction de vues.</p>
+      </div>
+
       <label class="inline">Visibilité sur YouTube
         <select id="privacy">
           <option value="public">Publique</option>

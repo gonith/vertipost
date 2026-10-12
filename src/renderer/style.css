@@ -107,6 +107,14 @@ button.ghost { background: transparent; }
 #advice { margin-top: 12px; border-top: 1px solid var(--line); }
 .proposal .text { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
 #apply { margin-top: 12px; }
+
+.score { margin-bottom: 16px; font-size: 13px; }
+.score p { margin: 0 0 6px; }
+.score ul { list-style: none; margin: 0 0 6px; padding: 0; }
+.score li { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+.score li.todo { color: var(--warn); }
+.score li span { color: var(--muted); }
+.score input { accent-color: var(--good); }
 .card input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
 .card details { margin-top: 8px; }
 .card summary { color: var(--muted); cursor: pointer; font-size: 13px; }

@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('vertipost', {
   inspectDropped: (file) => call('video:inspect', webUtils.getPathForFile(file)),
   check: (post, info) => call('check', post, info),
   publish: (request) => call('publish', request),
+  score: (post, keywords) => call('score', post, keywords),
   categories: () => call('categories'),
   assistantState: () => call('assistant:state'),
   saveAssistant: (values) => call('assistant:save', values),

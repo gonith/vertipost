@@ -185,6 +185,7 @@ function scheduleCheck() {
   checkTimer = setTimeout(async () => {
     state.warnings = await api.check(currentPost(), state.video && state.video.info);
     renderWarnings();
+    renderScore(await api.score(currentPost(), $('keywords').value));
   }, 200);
 }
 
@@ -246,7 +247,27 @@ drop.addEventListener('drop', async (e) => {
   }
 });
 
-for (const id of ['title', 'caption']) $(id).addEventListener('input', scheduleCheck);
+for (const id of ['title', 'caption', 'keywords']) $(id).addEventListener('input', scheduleCheck);
+$('keywords').addEventListener('input', () => {
+  try {
+    localStorage.setItem('keywords', $('keywords').value);
+  } catch {}
+});
+
+// La raison n'est affichée que pour ce qui reste à faire.
+function renderScore(rules) {
+  $('score-total').textContent = `${rules.filter((r) => r.ok).length} / ${rules.length}`;
+  $('score-list').replaceChildren(
+    ...rules.map((r) =>
+      el(
+        'li',
+        { className: r.ok ? '' : 'todo' },
+        el('input', { type: 'checkbox', checked: r.ok, disabled: true }),
+        el('div', {}, r.label, ...(r.ok ? [] : [el('br'), el('span', { textContent: r.why })])),
+      ),
+    ),
+  );
+}
 
 $('publish').addEventListener('click', async () => {
   const ids = targets();
@@ -335,7 +356,7 @@ $('advise').addEventListener('click', async () => {
   button.disabled = true;
   button.textContent = 'Réflexion en cours...';
   try {
-    state.advice = await api.advise({ brief: $('brief').value, post: currentPost(), info: state.video && state.video.info });
+    state.advice = await api.advise({ brief: $('brief').value, keywords: $('keywords').value, post: currentPost(), info: state.video && state.video.info });
     renderAdvice();
   } catch (e) {
     $('assistant-error').textContent = e.message;
@@ -356,8 +377,13 @@ function openSettings(p) {
   $('settings-redirect').value = p.redirectUri || '';
   $('settings-error').hidden = true;
   $('settings-fields').replaceChildren(
-    ...p.fields.map((f) =>
-      el(
+    ...p.fields.map((f) => {
+      if (f.options) {
+        const select = el('select', { name: f.key }, ...f.options.map((o) => el('option', { value: o.value, textContent: o.label })));
+        if (f.value) select.value = f.value;
+        return el('label', { textContent: f.label }, select);
+      }
+      return el(
         'label',
         { textContent: f.label },
         el('input', {
@@ -366,8 +392,8 @@ function openSettings(p) {
           value: f.value,
           placeholder: f.secret && f.filled ? 'Déjà enregistré, laisse vide pour le garder' : '',
         }),
-      ),
-    ),
+      );
+    }),
   );
   $('settings').showModal();
 }
@@ -378,7 +404,7 @@ $('settings-cancel').addEventListener('click', () => $('settings').close());
 $('settings').querySelector('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const values = {};
-  for (const input of $('settings-fields').querySelectorAll('input')) values[input.name] = input.value;
+  for (const input of $('settings-fields').querySelectorAll('input, select')) values[input.name] = input.value;
   try {
     if (editing === state.assistant) {
       state.assistant = await api.saveAssistant(values);
@@ -403,6 +429,10 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
       category = localStorage.getItem('category');
     } catch {}
     $('category').value = categories.list.some((c) => c.id === category) ? category : categories.initial;
+    try {
+      $('keywords').value = localStorage.getItem('keywords') || '';
+    } catch {}
+    scheduleCheck();
     state.assistant = await api.assistantState();
     renderAssistant();
     const list = await api.state();

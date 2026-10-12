@@ -50,14 +50,23 @@ Tu n'as accès à aucune donnée en direct : ni volumes de recherche, ni tendanc
 
 Écris le titre et les légendes dans la langue de la description du créateur, sauf s'il demande autre chose, et n'invente rien sur le contenu de la vidéo : si un élément utile manque, le conseil correspondant le lui dit. Les conseils (tips) sont en français, au tutoiement, entre trois et cinq, chacun rattaché à un choix concret que tu viens de faire ; l'un d'eux explique la catégorie retenue.`;
 
+// Gemini attend un sous-ensemble d'OpenAPI et refuse ces deux mots-clés de JSON Schema.
+function geminiSchema(schema) {
+  if (Array.isArray(schema)) return schema.map(geminiSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const { $schema, additionalProperties, ...rest } = schema;
+  return Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, geminiSchema(v)]));
+}
+
 // `info` vient de ffprobe et peut être null.
-function adviceMessage({ brief, post, info }) {
+function adviceMessage({ brief, keywords, post, info }) {
   const draft = (label, text) => `${label} : ${(text || '').trim() || '(vide)'}`;
   const limits = Object.entries(LIMITS)
     .map(([id, l]) => `- ${id} : ${l.title ? `titre ${l.title} caractères, ` : ''}légende ${l.caption} caractères`)
     .join('\n');
   return [
     `Ma vidéo :\n${brief.trim()}`,
+    (keywords || '').trim() ? `Les mots-clés de ma niche : ${keywords.trim()}` : null,
     info ? `Format : ${info.width}x${info.height}, ${Math.round(info.duration)} secondes.` : null,
     `Mon brouillon :\n${draft('Titre', post.title)}\n${draft('Légende', post.caption)}`,
     `Limites de longueur :\n${limits}`,
@@ -67,4 +76,4 @@ function adviceMessage({ brief, post, info }) {
     .join('\n\n');
 }
 
-module.exports = { CATEGORIES, DEFAULT_CATEGORY, categoryOf, Advice, SYSTEM, adviceMessage };
+module.exports = { CATEGORIES, DEFAULT_CATEGORY, categoryOf, Advice, SYSTEM, adviceMessage, geminiSchema };
