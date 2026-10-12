@@ -129,6 +129,25 @@ async function publish(sender, { filePath, post, targets }) {
   );
 }
 
+// Une plateforme en panne ou déconnectée ne doit pas masquer les statistiques des autres.
+function stats() {
+  const data = store.load();
+  return Promise.all(
+    platforms.map(async (p) => {
+      const saved = data[p.id] || {};
+      const base = { id: p.id, name: p.name, rows: [], note: null, error: null };
+      if (!p.stats) return { ...base, note: "Vertipost n'a pas accès aux statistiques de cette plateforme : consulte-les dans son application." };
+      if (!saved.tokens) return { ...base, note: 'Compte non connecté.' };
+      try {
+        const ctx = { config: saved.config, tokens: saved.tokens, saveTokens: (tokens) => store.update(p.id, { tokens }) };
+        return { ...base, ...(await p.stats(ctx)) };
+      } catch (e) {
+        return { ...base, error: e.message };
+      }
+    }),
+  );
+}
+
 // Une erreur levée dans un gestionnaire arrive côté interface préfixée par Electron
 // (« Error invoking remote method... ») : on renvoie donc le message tel quel.
 function handle(channel, fn) {
@@ -169,6 +188,7 @@ handle('check', (_e, post, info) =>
 );
 handle('publish', (event, request) => publish(event.sender, request));
 handle('score', (_e, post, keywords) => checklist({ title: post.title, caption: post.caption, keywords }));
+handle('stats', () => stats());
 handle('categories', () => ({ list: CATEGORIES, initial: DEFAULT_CATEGORY }));
 handle('assistant:state', () => describeAssistant());
 handle('assistant:save', (_e, values) => {

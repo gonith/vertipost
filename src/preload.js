@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('vertipost', {
   check: (post, info) => call('check', post, info),
   publish: (request) => call('publish', request),
   score: (post, keywords) => call('score', post, keywords),
+  stats: () => call('stats'),
   categories: () => call('categories'),
   assistantState: () => call('assistant:state'),
   saveAssistant: (values) => call('assistant:save', values),

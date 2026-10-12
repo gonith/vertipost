@@ -111,6 +111,34 @@ async function publish(ctx) {
   return { url: `https://www.youtube.com/shorts/${sent.data.id}`, note };
 }
 
+// Les dernières vidéos de la chaîne avec leurs compteurs. La liste des envois de la chaîne
+// contient aussi les vidéos privées, pour son propriétaire.
+const RECENT = 15;
+const DATA = 'https://www.googleapis.com/youtube/v3';
+
+async function stats(ctx) {
+  const headers = { Authorization: `Bearer ${await accessToken(ctx)}` };
+  const channels = await request(`${DATA}/channels?part=contentDetails&mine=true`, { headers });
+  const channel = channels.data.items && channels.data.items[0];
+  if (!channel) return { rows: [] };
+  const uploads = channel.contentDetails.relatedPlaylists.uploads;
+  const list = await request(`${DATA}/playlistItems?part=contentDetails&maxResults=${RECENT}&playlistId=${uploads}`, { headers });
+  const ids = (list.data.items || []).map((item) => item.contentDetails.videoId);
+  if (!ids.length) return { rows: [] };
+  const videos = await request(`${DATA}/videos?part=snippet,statistics&id=${ids.join(',')}`, { headers });
+  const count = (value) => (value === undefined ? null : Number(value));
+  return {
+    rows: (videos.data.items || []).map((v) => ({
+      title: v.snippet.title,
+      url: `https://www.youtube.com/watch?v=${v.id}`,
+      date: v.snippet.publishedAt,
+      views: count(v.statistics.viewCount),
+      likes: count(v.statistics.likeCount),
+      comments: count(v.statistics.commentCount),
+    })),
+  };
+}
+
 module.exports = {
   id: 'youtube',
   name: 'YouTube Shorts',
@@ -128,4 +156,5 @@ module.exports = {
   ],
   connect,
   publish,
+  stats,
 };

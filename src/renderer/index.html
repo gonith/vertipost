@@ -9,6 +9,7 @@
 <body>
   <nav class="tabs">
     <button id="tab-publish" class="tab">Publier</button>
+    <button id="tab-stats" class="tab">Statistiques</button>
     <button id="tab-settings" class="tab">Paramètres</button>
   </nav>
 
@@ -72,6 +73,16 @@
       <button id="publish" class="primary" disabled>Publier</button>
     </section>
   </main>
+
+  <section id="page-stats" class="stats" hidden>
+    <div class="row">
+      <h2>Tes dernières vidéos</h2>
+      <span class="grow"></span>
+      <button id="stats-refresh">Actualiser</button>
+    </div>
+    <p id="stats-error" class="bad" hidden></p>
+    <div id="stats"></div>
+  </section>
 
   <section id="page-settings" class="settings" hidden>
     <h2>Assistant par IA</h2>

@@ -25,6 +25,17 @@ body {
 .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); padding: 8px 14px; }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
+.stats { padding: 8px 24px 24px; }
+.stats .row { display: flex; align-items: center; gap: 8px; }
+.stats h3 { font-size: 14px; margin: 20px 0 6px; }
+.stats h3 span { color: var(--muted); font-weight: normal; }
+.stats table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.stats th, .stats td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.stats th { color: var(--muted); font-weight: normal; }
+.stats th:first-child, .stats td:first-child { text-align: left; white-space: normal; width: 100%; }
+.stats td button { border: none; background: none; padding: 0; color: var(--text); text-align: left; }
+.stats td button:hover { color: var(--accent); }
+
 .settings { max-width: 720px; padding: 8px 24px 24px; }
 .settings ol { padding-left: 18px; color: var(--muted); font-size: 13px; }
 .settings li { margin-bottom: 4px; }

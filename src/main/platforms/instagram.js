@@ -16,6 +16,8 @@ const SCOPES = [
   'pages_show_list',
   'pages_read_engagement',
   'business_management',
+  // Sert uniquement aux statistiques : vues, portée, partages et enregistrements.
+  'instagram_manage_insights',
 ];
 
 const query = (params) => new URLSearchParams(params).toString();
@@ -145,6 +147,45 @@ async function upload({ tokens, auth, caption, progress, file, attempts }) {
   throw Object.assign(new Error(`L'envoi à Instagram a échoué (${last.status}) : ${last.text.slice(0, 600)}`), { flaky });
 }
 
+// Les dernières publications du compte. Les mentions J'aime et les commentaires viennent avec la
+// liste ; vues, partages et enregistrements demandent une autorisation de plus, absente d'une
+// connexion faite avant l'ajout des statistiques.
+const RECENT = 15;
+const INSIGHTS = { views: 'views', shares: 'shares', saved: 'saves' };
+
+async function stats({ tokens }) {
+  if (Date.now() > tokens.expiresAt) {
+    throw new Error('Session Instagram expirée (elle dure environ 60 jours), reconnecte le compte.');
+  }
+  const headers = { Authorization: `OAuth ${tokens.access}` };
+  const fields = 'id,caption,permalink,timestamp,like_count,comments_count';
+  const media = await request(`${GRAPH}/${tokens.igUserId}/media?fields=${fields}&limit=${RECENT}`, { headers });
+  let denied = 0;
+  const rows = await Promise.all(
+    (media.data.data || []).map(async (m) => {
+      const row = {
+        title: (m.caption || '(sans légende)').split('\n')[0],
+        url: m.permalink,
+        date: m.timestamp,
+        views: null,
+        likes: m.like_count === undefined ? null : m.like_count,
+        comments: m.comments_count === undefined ? null : m.comments_count,
+        shares: null,
+        saves: null,
+      };
+      try {
+        const insights = await request(`${GRAPH}/${m.id}/insights?metric=${Object.keys(INSIGHTS).join(',')}`, { headers });
+        for (const metric of insights.data.data || []) row[INSIGHTS[metric.name]] = metric.values[0].value;
+      } catch {
+        denied++;
+      }
+      return row;
+    }),
+  );
+  const note = rows.length && denied === rows.length ? 'Pour voir les vues, les partages et les enregistrements, déconnecte puis reconnecte Instagram : une autorisation de plus est nécessaire.' : null;
+  return { rows, note };
+}
+
 module.exports = {
   id: 'instagram',
   name: 'Instagram Reels',
@@ -162,4 +203,5 @@ module.exports = {
   ],
   connect,
   publish,
+  stats,
 };

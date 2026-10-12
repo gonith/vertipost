@@ -296,14 +296,78 @@ api.onProgress(({ id, phase, fraction }) => {
 
 // Onglets.
 function showTab(name) {
-  for (const tab of ['publish', 'settings']) {
+  for (const tab of ['publish', 'stats', 'settings']) {
     $(`page-${tab}`).hidden = tab !== name;
     $(`tab-${tab}`).classList.toggle('active', tab === name);
   }
 }
 $('tab-publish').addEventListener('click', () => showTab('publish'));
+$('tab-stats').addEventListener('click', () => {
+  showTab('stats');
+  if (!statsLoaded) loadStats();
+});
+$('stats-refresh').addEventListener('click', loadStats);
 $('tab-settings').addEventListener('click', () => showTab('settings'));
 showTab('publish');
+
+// Statistiques : les dernières vidéos de chaque plateforme, chargées à la première ouverture.
+const STAT_COLUMNS = [
+  ['views', 'Vues'],
+  ['likes', "J'aime"],
+  ['comments', 'Commentaires'],
+  ['shares', 'Partages'],
+  ['saves', 'Enregistrements'],
+];
+let statsLoaded = false;
+
+const count = (value) => (value === null || value === undefined ? '-' : value.toLocaleString('fr-FR'));
+
+function statsSection(p) {
+  const nodes = [];
+  const known = p.rows.filter((row) => row.views !== null && row.views !== undefined);
+  const views = known.reduce((sum, row) => sum + row.views, 0);
+  const summary = p.rows.length ? ` ${p.rows.length} vidéos${known.length ? `, ${count(views)} vues` : ''}` : '';
+  nodes.push(el('h3', {}, p.name, el('span', { textContent: summary })));
+  if (p.error) nodes.push(el('p', { className: 'bad', textContent: p.error }));
+  if (p.note) nodes.push(el('p', { className: 'muted', textContent: p.note }));
+  if (!p.rows.length) {
+    if (!p.error && !p.note) nodes.push(el('p', { className: 'muted', textContent: 'Aucune vidéo.' }));
+    return nodes;
+  }
+  // Une colonne que la plateforme ne fournit pour aucune vidéo n'est pas affichée.
+  const columns = STAT_COLUMNS.filter(([key]) => p.rows.some((row) => row[key] !== null && row[key] !== undefined));
+  const head = el('tr', {}, el('th', { textContent: 'Vidéo' }), el('th', { textContent: 'Date' }), ...columns.map(([, label]) => el('th', { textContent: label })));
+  const lines = p.rows.map((row) => {
+    const open = el('button', { textContent: row.title });
+    open.addEventListener('click', () => api.open(row.url));
+    return el(
+      'tr',
+      {},
+      el('td', {}, open),
+      el('td', { textContent: new Date(row.date).toLocaleDateString('fr-FR') }),
+      ...columns.map(([key]) => el('td', { textContent: count(row[key]) })),
+    );
+  });
+  nodes.push(el('table', {}, el('thead', {}, head), el('tbody', {}, ...lines)));
+  return nodes;
+}
+
+async function loadStats() {
+  const button = $('stats-refresh');
+  button.disabled = true;
+  button.textContent = 'Chargement...';
+  $('stats-error').hidden = true;
+  try {
+    const list = await api.stats();
+    $('stats').replaceChildren(...list.flatMap(statsSection));
+    statsLoaded = true;
+  } catch (e) {
+    $('stats-error').textContent = e.message;
+    $('stats-error').hidden = false;
+  }
+  button.disabled = false;
+  button.textContent = 'Actualiser';
+}
 
 // Paramètres de l'assistant. L'affichage et la langue sont des préférences de l'interface ;
 // l'IA choisie et les clés partent dans le stockage chiffré.

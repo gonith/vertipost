@@ -34,6 +34,12 @@ reposent sur les règles générales du format court.
 La grille **Pertinence** fonctionne sans IA : elle coche, à partir de tes mots-clés de niche, les
 bonnes pratiques que ton titre et ta légende respectent (`src/main/lib/score.js`).
 
+## Statistiques
+
+L'onglet **Statistiques** liste les quinze dernières vidéos de la chaîne YouTube et du compte
+Instagram avec leurs vues, mentions J'aime et commentaires, plus les partages et enregistrements
+sur Instagram. TikTok n'y figure pas : en mode assisté, Vertipost n'a pas accès à son API.
+
 ## Organisation du code
 
 - `src/main/platforms/` : une plateforme par fichier, avec la même forme (`connect`, `publish`).
