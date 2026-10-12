@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('vertipost', {
   inspectDropped: (file) => call('video:inspect', webUtils.getPathForFile(file)),
   check: (post, info) => call('check', post, info),
   publish: (request) => call('publish', request),
+  categories: () => call('categories'),
+  assistantState: () => call('assistant:state'),
+  saveAssistant: (values) => call('assistant:save', values),
+  advise: (input) => call('assistant:advise', input),
   open: (url) => call('open', url),
   onProgress: (fn) => ipcRenderer.on('progress', (_event, payload) => fn(payload)),
 });

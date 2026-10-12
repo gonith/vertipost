@@ -1,5 +1,6 @@
 const { authorize, PORT } = require('../oauth');
 const { request, sendFile } = require('../lib/http');
+const { categoryOf } = require('../lib/advice');
 
 const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -82,7 +83,7 @@ async function publish(ctx) {
         'X-Upload-Content-Type': video.mime,
       },
       json: {
-        snippet: { title: post.title.trim(), description: caption, categoryId: '22' },
+        snippet: { title: post.title.trim(), description: caption, categoryId: categoryOf(post.categoryId) },
         status: { privacyStatus: wanted, selfDeclaredMadeForKids: false },
       },
     },

@@ -11,6 +11,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Sans cette règle, un `display` posé plus bas l'emporte sur l'attribut hidden. */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -86,16 +88,25 @@ button.ghost { background: transparent; }
 .bad { color: var(--bad); }
 .good { color: var(--good); }
 
-.card {
+.card, .assistant {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 10px;
 }
-.card .row, dialog .row { display: flex; align-items: center; gap: 8px; }
+.card .row, .assistant .row, dialog .row { display: flex; align-items: center; gap: 8px; }
 .grow { flex: 1; }
-.card .name { font-weight: 600; }
+.card .name, .assistant .name { font-weight: 600; }
+.assistant { margin-bottom: 16px; }
+.assistant label { margin: 10px 0; }
+.assistant p { margin: 8px 0 0; }
+.assistant h3 { font-size: 13px; margin: 14px 0 4px; }
+.assistant ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.assistant li { margin-bottom: 6px; }
+#advice { margin-top: 12px; border-top: 1px solid var(--line); }
+.proposal .text { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+#apply { margin-top: 12px; }
 .card input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
 .card details { margin-top: 8px; }
 .card summary { color: var(--muted); cursor: pointer; font-size: 13px; }

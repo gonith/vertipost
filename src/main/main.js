@@ -5,6 +5,8 @@ const store = require('./store');
 const platforms = require('./platforms');
 const { inspect } = require('./video');
 const { warnings, captionFor } = require('./lib/rules');
+const { CATEGORIES, DEFAULT_CATEGORY } = require('./lib/advice');
+const assistant = require('./assistant');
 
 // Node ne lit pas le magasin de certificats de Windows. Sur un poste où un antivirus
 // re-signe le HTTPS (Avast, Kaspersky...), toutes les requêtes échoueraient en
@@ -56,6 +58,23 @@ function saveConfig(id, values) {
   }
   const sameApp = saved.config && saved.config.clientId === config.clientId;
   store.update(id, sameApp ? { config } : { config, tokens: null, account: null });
+}
+
+function describeAssistant() {
+  const config = (store.load().assistant || {}).config || {};
+  const filled = Boolean(config.apiKey);
+  return {
+    ...assistant.settings,
+    fields: assistant.settings.fields.map((f) => ({ ...f, value: '', filled })),
+    configured: filled,
+  };
+}
+
+async function advise(input) {
+  const config = (store.load().assistant || {}).config || {};
+  if (!config.apiKey) throw new Error("Renseigne d'abord la clé API de l'assistant.");
+  if (!(input.brief || '').trim()) throw new Error("Décris d'abord ta vidéo.");
+  return assistant.advise(config.apiKey, input);
 }
 
 async function connect(id) {
@@ -131,6 +150,14 @@ handle('check', (_e, post, info) =>
   Object.fromEntries(platforms.map((p) => [p.id, warnings(p.id, post, info)])),
 );
 handle('publish', (event, request) => publish(event.sender, request));
+handle('categories', () => ({ list: CATEGORIES, initial: DEFAULT_CATEGORY }));
+handle('assistant:state', () => describeAssistant());
+handle('assistant:save', (_e, values) => {
+  const apiKey = (values.apiKey || '').trim();
+  if (apiKey) store.update('assistant', { config: { apiKey } });
+  return describeAssistant();
+});
+handle('assistant:advise', (_e, input) => advise(input));
 handle('open', (_e, url) => {
   if (new URL(url).protocol !== 'https:') throw new Error('Seuls les liens https sont ouverts.');
   return shell.openExternal(url);

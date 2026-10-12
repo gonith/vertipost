@@ -22,5 +22,9 @@
   "devDependencies": {
     "electron": "^44.6.0",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "zod": "^4.6.6"
   }
 }

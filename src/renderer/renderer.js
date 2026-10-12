@@ -10,6 +10,9 @@ const state = {
   progress: {},
   results: {},
   busy: false,
+  categories: [],
+  assistant: null,
+  advice: null,
 };
 // Éléments de chaque carte mis à jour sans reconstruire la liste, par identifiant de plateforme.
 const refs = {};
@@ -45,6 +48,7 @@ function currentPost() {
     title: $('title').value,
     caption: $('caption').value,
     privacy: $('privacy').value,
+    categoryId: $('category').value,
     overrides: state.overrides,
   };
 }
@@ -267,14 +271,89 @@ api.onProgress(({ id, phase, fraction }) => {
   renderProgress();
 });
 
-// Réglages d'une plateforme.
+// Assistant de référencement.
+function renderAssistant() {
+  const ready = Boolean(state.assistant && state.assistant.configured);
+  $('assistant-status').textContent = ready ? '' : 'Clé API à renseigner';
+  $('advise').disabled = !ready;
+}
+
+function proposal(label, text) {
+  return el(
+    'div',
+    { className: 'proposal' },
+    el('p', { className: 'muted', textContent: label }),
+    el('p', { className: 'text', textContent: text }),
+  );
+}
+
+function renderAdvice() {
+  const advice = state.advice;
+  $('advice').hidden = !advice;
+  if (!advice) return;
+  const category = state.categories.find((c) => c.id === advice.categoryId);
+  const apply = el('button', { id: 'apply', className: 'primary', textContent: 'Appliquer au formulaire' });
+  apply.addEventListener('click', applyAdvice);
+  $('advice').replaceChildren(
+    proposal('Titre YouTube', advice.title),
+    proposal('Catégorie YouTube', category.name),
+    proposal('Description YouTube', advice.captions.youtube),
+    proposal('Légende Instagram', advice.captions.instagram),
+    proposal("Légende TikTok, à coller dans l'application TikTok", advice.captions.tiktok),
+    proposal('Post X', advice.captions.x),
+    apply,
+    el('h3', { textContent: 'Pourquoi ces choix' }),
+    el('ul', {}, ...advice.tips.map((t) => el('li', {}, el('strong', { textContent: t.title }), ' ', t.text))),
+  );
+}
+
+// La description YouTube devient la légende commune ; Instagram et X reçoivent la leur.
+function applyAdvice() {
+  const { title, categoryId, captions } = state.advice;
+  $('title').value = title;
+  $('caption').value = captions.youtube;
+  setCategory(categoryId);
+  state.overrides.instagram = captions.instagram;
+  state.overrides.x = captions.x;
+  scheduleCheck();
+  render();
+}
+
+function setCategory(id) {
+  $('category').value = id;
+  try {
+    localStorage.setItem('category', id);
+  } catch {}
+}
+
+$('category').addEventListener('change', (e) => setCategory(e.target.value));
+$('assistant-configure').addEventListener('click', () => openSettings(state.assistant));
+$('advise').addEventListener('click', async () => {
+  const button = $('advise');
+  const label = button.textContent;
+  $('assistant-error').hidden = true;
+  button.disabled = true;
+  button.textContent = 'Réflexion en cours...';
+  try {
+    state.advice = await api.advise({ brief: $('brief').value, post: currentPost(), info: state.video && state.video.info });
+    renderAdvice();
+  } catch (e) {
+    $('assistant-error').textContent = e.message;
+    $('assistant-error').hidden = false;
+  }
+  button.textContent = label;
+  renderAssistant();
+});
+
+// Réglages d'une plateforme ou de l'assistant.
 let editing = null;
 
 function openSettings(p) {
   editing = p;
   $('settings-title').textContent = `Configurer ${p.name}`;
   $('settings-help').replaceChildren(...p.help.map((line) => el('li', { textContent: line })));
-  $('settings-redirect').value = p.redirectUri;
+  $('settings-redirect-label').hidden = !p.redirectUri;
+  $('settings-redirect').value = p.redirectUri || '';
   $('settings-error').hidden = true;
   $('settings-fields').replaceChildren(
     ...p.fields.map((f) =>
@@ -301,7 +380,12 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
   const values = {};
   for (const input of $('settings-fields').querySelectorAll('input')) values[input.name] = input.value;
   try {
-    setPlatforms(await api.saveConfig(editing.id, values));
+    if (editing === state.assistant) {
+      state.assistant = await api.saveAssistant(values);
+      renderAssistant();
+    } else {
+      setPlatforms(await api.saveConfig(editing.id, values));
+    }
     $('settings').close();
   } catch (err) {
     $('settings-error').textContent = err.message;
@@ -311,6 +395,16 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
 
 (async () => {
   try {
+    const categories = await api.categories();
+    state.categories = categories.list;
+    $('category').replaceChildren(...categories.list.map((c) => el('option', { value: c.id, textContent: c.name })));
+    let category = null;
+    try {
+      category = localStorage.getItem('category');
+    } catch {}
+    $('category').value = categories.list.some((c) => c.id === category) ? category : categories.initial;
+    state.assistant = await api.assistantState();
+    renderAssistant();
     const list = await api.state();
     state.selected = loadSelection() || new Set(list.filter((p) => p.connected).map((p) => p.id));
     setPlatforms(list);

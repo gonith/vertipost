@@ -18,6 +18,21 @@
     </section>
 
     <section class="form">
+      <div class="assistant">
+        <div class="row">
+          <span class="name">Assistant de référencement</span>
+          <span id="assistant-status" class="muted"></span>
+          <span class="grow"></span>
+          <button id="assistant-configure" class="ghost">Configurer</button>
+        </div>
+        <label>De quoi parle ta vidéo ?
+          <textarea id="brief" rows="3" placeholder="Le jeu, son genre, ce qui se passe à l'écran, à qui tu t'adresses..."></textarea>
+        </label>
+        <button id="advise" disabled>Proposer un titre et des légendes</button>
+        <p id="assistant-error" class="bad" hidden></p>
+        <div id="advice" hidden></div>
+      </div>
+
       <label>Titre <span class="muted">(YouTube)</span>
         <input id="title" type="text" maxlength="100" placeholder="Le titre de ton Short">
       </label>
@@ -32,6 +47,10 @@
         </select>
       </label>
 
+      <label class="inline">Catégorie YouTube
+        <select id="category"></select>
+      </label>
+
       <h2>Plateformes</h2>
       <div id="platforms"></div>
 
@@ -44,7 +63,7 @@
     <form method="dialog">
       <h2 id="settings-title"></h2>
       <ol id="settings-help"></ol>
-      <label>Adresse de redirection à déclarer dans l'application
+      <label id="settings-redirect-label">Adresse de redirection à déclarer dans l'application
         <input id="settings-redirect" type="text" readonly>
       </label>
       <div id="settings-fields"></div>

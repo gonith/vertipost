@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { challenge } = require('../src/main/lib/pkce');
 const { MB, fixedChunks, tiktokPlan } = require('../src/main/lib/chunks');
 const { captionFor, warnings } = require('../src/main/lib/rules');
+const { adviceMessage, categoryOf } = require('../src/main/lib/advice');
 
 test('challenge PKCE : vecteur de la RFC 7636 en base64url, même condensat en hex pour TikTok', () => {
   const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
@@ -65,4 +66,16 @@ test('warnings signale longueur, titre, orientation et durée', () => {
   assert.equal(warnings('instagram', { caption: '' }, { width: 1920, height: 1080, duration: 30 }).length, 1);
   assert.equal(warnings('x', { caption: '' }, { ...vertical, duration: 141 }).length, 1);
   assert.deepEqual(warnings('tiktok', { caption: '' }, null), []);
+});
+
+test("adviceMessage porte la description, le brouillon, les limites et les catégories ; categoryOf retombe sur la catégorie par défaut", () => {
+  const message = adviceMessage({ brief: ' Mon jeu de plateforme ', post: { title: 'Niveau 3', caption: '' }, info: null });
+  assert.match(message, /Ma vidéo :\nMon jeu de plateforme\n/);
+  assert.match(message, /Titre : Niveau 3\nLégende : \(vide\)/);
+  assert.match(message, /- x : légende 280 caractères/);
+  assert.match(message, /- 20 : Jeux vidéo/);
+  assert.doesNotMatch(message, /Format :/);
+  assert.equal(categoryOf('20'), '20');
+  assert.equal(categoryOf('999'), '22');
+  assert.equal(categoryOf(undefined), '22');
 });
