@@ -60,17 +60,6 @@ function sendFile(url, { method = 'PUT', headers = {}, filePath, start, end, onP
   });
 }
 
-async function readRange(filePath, start, end) {
-  const handle = await fs.promises.open(filePath, 'r');
-  try {
-    const buffer = Buffer.alloc(end - start + 1);
-    await handle.read(buffer, 0, buffer.length, start);
-    return buffer;
-  } finally {
-    await handle.close();
-  }
-}
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { request, sendFile, readRange, sleep, label };
+module.exports = { request, sendFile, sleep, label };

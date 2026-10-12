@@ -454,14 +454,13 @@ function renderAdvice() {
     proposal('Description YouTube', advice.captions.youtube),
     proposal('Légende Instagram', advice.captions.instagram),
     proposal('Légende TikTok', advice.captions.tiktok),
-    proposal('Post X', advice.captions.x),
     apply,
     el('h3', { textContent: 'Pourquoi ces choix' }),
     el('ul', {}, ...advice.tips.map((t) => el('li', {}, el('strong', { textContent: t.title }), ' ', t.text))),
   );
 }
 
-// La description YouTube devient la légende commune ; Instagram, TikTok et X reçoivent la leur.
+// La description YouTube devient la légende commune ; Instagram et TikTok reçoivent la leur.
 // Les mots-clés proposés ne remplacent pas ceux que l'utilisateur a déjà choisis.
 function applyAdvice() {
   const { title, categoryId, captions, keywords } = state.advice;
@@ -471,7 +470,6 @@ function applyAdvice() {
   setCategory(categoryId);
   state.overrides.instagram = captions.instagram;
   state.overrides.tiktok = captions.tiktok;
-  state.overrides.x = captions.x;
   scheduleCheck();
   render();
 }

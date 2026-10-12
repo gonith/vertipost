@@ -2,7 +2,7 @@ const http = require('http');
 const { shell } = require('electron');
 const { randomToken, challenge } = require('./lib/pkce');
 
-// Un seul port pour toutes les plateformes : X, TikTok et Meta exigent que l'adresse de
+// Un seul port pour toutes les plateformes : TikTok et Meta exigent que l'adresse de
 // retour soit déclarée à l'avance, caractère pour caractère.
 const PORT = 8765;
 const TIMEOUT_MS = 5 * 60 * 1000;

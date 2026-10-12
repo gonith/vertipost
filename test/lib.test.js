@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { challenge } = require('../src/main/lib/pkce');
-const { MB, fixedChunks, tiktokPlan } = require('../src/main/lib/chunks');
+const { MB, tiktokPlan } = require('../src/main/lib/chunks');
 const { captionFor, warnings, lighterSize } = require('../src/main/lib/rules');
 const { adviceMessage, categoryOf, geminiSchema } = require('../src/main/lib/advice');
 const { keywordsOf, checklist } = require('../src/main/lib/score');
@@ -22,14 +22,6 @@ function assertCovers(chunks, size) {
   }
   assert.equal(next, size);
 }
-
-test('fixedChunks couvre le fichier sans trou ni recouvrement', () => {
-  for (const size of [1, 4 * MB, 4 * MB + 1, 9 * MB + 123]) {
-    const chunks = fixedChunks(size, 4 * MB);
-    assertCovers(chunks, size);
-    assert.equal(chunks.length, Math.ceil(size / (4 * MB)));
-  }
-});
 
 test('tiktokPlan : un seul bloc jusqu\'à 64 Mo', () => {
   for (const size of [1, 3 * MB, 64 * MB]) {
@@ -53,8 +45,8 @@ test('tiktokPlan : au-delà, floor(taille / tranche) tranches et la dernière ab
 });
 
 test('captionFor préfère la légende propre à la plateforme, sauf si elle est vide', () => {
-  const post = { caption: 'commune', overrides: { x: 'pour X', youtube: '   ' } };
-  assert.equal(captionFor('x', post), 'pour X');
+  const post = { caption: 'commune', overrides: { tiktok: 'pour TikTok', youtube: '   ' } };
+  assert.equal(captionFor('tiktok', post), 'pour TikTok');
   assert.equal(captionFor('youtube', post), 'commune');
   assert.equal(captionFor('instagram', post), 'commune');
 });
@@ -63,10 +55,10 @@ test('warnings signale longueur, titre, orientation et durée', () => {
   const vertical = { width: 1080, height: 1920, duration: 30 };
   assert.deepEqual(warnings('youtube', { title: 'ok', caption: 'ok' }, vertical), []);
   assert.equal(warnings('youtube', { title: '', caption: '' }, vertical).length, 1);
-  assert.equal(warnings('x', { caption: 'a'.repeat(281) }, vertical).length, 1);
-  assert.equal(warnings('x', { caption: 'a'.repeat(281), overrides: { x: 'court' } }, vertical).length, 0);
+  assert.equal(warnings('tiktok', { caption: 'a'.repeat(2201) }, vertical).length, 1);
+  assert.equal(warnings('tiktok', { caption: 'a'.repeat(2201), overrides: { tiktok: 'court' } }, vertical).length, 0);
   assert.equal(warnings('instagram', { caption: '' }, { width: 1920, height: 1080, duration: 30 }).length, 1);
-  assert.equal(warnings('x', { caption: '' }, { ...vertical, duration: 141 }).length, 1);
+  assert.equal(warnings('tiktok', { caption: '' }, { ...vertical, duration: 601 }).length, 1);
   assert.deepEqual(warnings('tiktok', { caption: '' }, null), []);
 });
 
@@ -74,7 +66,8 @@ test("adviceMessage porte la description, le brouillon, les limites et les caté
   const message = adviceMessage({ brief: ' Mon jeu de plateforme ', post: { title: 'Niveau 3', caption: '' }, info: null });
   assert.match(message, /Ma vidéo :\nMon jeu de plateforme\n/);
   assert.match(message, /Titre : Niveau 3\nLégende : \(vide\)/);
-  assert.match(message, /- x : légende 280 caractères/);
+  assert.match(message, /- tiktok : légende 2200 caractères/);
+  assert.doesNotMatch(message, /- x :/);
   assert.match(message, /- 20 : Jeux vidéo/);
   assert.match(message, /pas encore choisi les mots-clés/);
   assert.match(message, /dans ses 40 premiers caractères, et fait 60 caractères ou moins/);

@@ -1,7 +1,7 @@
 {
   "name": "vertipost",
   "version": "0.1.0",
-  "description": "Publie une vidéo verticale sur YouTube Shorts, Instagram Reels, TikTok et X en une fois.",
+  "description": "Publie une vidéo verticale sur YouTube Shorts, Instagram Reels et TikTok en une fois.",
   "main": "src/main/main.js",
   "private": true,
   "scripts": {

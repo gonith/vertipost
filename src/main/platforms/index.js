@@ -1,1 +1,1 @@
-module.exports = [require('./youtube'), require('./instagram'), require('./tiktok'), require('./x')];
+module.exports = [require('./youtube'), require('./instagram'), require('./tiktok')];

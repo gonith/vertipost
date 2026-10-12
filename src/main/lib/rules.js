@@ -4,7 +4,6 @@ const LIMITS = {
   youtube: { title: 100, caption: 5000, seconds: 180 },
   instagram: { caption: 2200, seconds: 900 },
   tiktok: { caption: 2200, seconds: 600 },
-  x: { caption: 280, seconds: 140 },
 };
 
 // Format exigé par Instagram pour un Reel envoyé par l'API, plus strict que les autres plateformes.

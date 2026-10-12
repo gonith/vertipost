@@ -1,7 +1,7 @@
 # Vertipost
 
-Application Windows qui publie une vidéo verticale sur YouTube Shorts, Instagram Reels, TikTok
-et X en une fois, par les API officielles de chaque plateforme.
+Application Windows qui publie une vidéo verticale sur YouTube Shorts, Instagram Reels et TikTok
+en une fois : par leur API officielle pour YouTube et Instagram, en mode assisté pour TikTok.
 
 ```
 npm install
@@ -22,7 +22,6 @@ profil de l'application, et ne quittent pas la machine.
 | YouTube | Les vidéos restent en privé tant que le projet Google n'a pas passé l'audit de conformité. 100 envois par jour. |
 | Instagram | Compte Créateur ou Business, relié à une Page Facebook. Connexion à refaire tous les 60 jours environ. |
 | TikTok | Mode assisté : Vertipost ouvre la page d'envoi de TikTok, montre le fichier et copie la légende, tu termines à la main. TikTok ne valide pas un outil personnel, et sans validation son API reste bridée. |
-| X | API payante à l'usage, crédits prépayés. |
 
 ## Assistant de référencement
 
