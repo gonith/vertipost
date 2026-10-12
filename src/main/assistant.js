@@ -1,11 +1,13 @@
 const { z } = require('zod');
 const { Anthropic } = require('@anthropic-ai/sdk');
 const { betaZodOutputFormat } = require('@anthropic-ai/sdk/helpers/beta/zod');
-const { request } = require('./lib/http');
+const { request, sleep } = require('./lib/http');
 const { Advice, SYSTEM, adviceMessage, categoryOf, geminiSchema } = require('./lib/advice');
 
 const CLAUDE_MODEL = 'claude-opus-5-5';
-const GEMINI_MODEL = 'gemini-3.8-flash';
+// Modèles gratuits, du meilleur au plus léger : on descend quand l'un est saturé ou a épuisé son quota.
+const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+const BUSY = [429, 503];
 
 function explain(error) {
   if (error instanceof Anthropic.AuthenticationError) return "Clé API refusée par Anthropic : vérifie-la dans les réglages de l'assistant.";
@@ -38,18 +40,26 @@ async function claude(apiKey, input) {
   return response.parsed_output;
 }
 
+async function geminiCall(apiKey, input) {
+  const json = {
+    systemInstruction: { parts: [{ text: SYSTEM }] },
+    contents: [{ role: 'user', parts: [{ text: adviceMessage(input) }] }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(z.toJSONSchema(Advice)) },
+  };
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      return (await request(url, { headers: { 'x-goog-api-key': apiKey }, json })).data;
+    } catch (e) {
+      if (!BUSY.includes(e.status)) throw e;
+      await sleep(1000);
+    }
+  }
+  throw new Error('Gemini est saturé ou ton quota gratuit du jour est épuisé. Réessaie dans quelques minutes.');
+}
+
 async function gemini(apiKey, input) {
-  const { data } = await request(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      headers: { 'x-goog-api-key': apiKey },
-      json: {
-        systemInstruction: { parts: [{ text: SYSTEM }] },
-        contents: [{ role: 'user', parts: [{ text: adviceMessage(input) }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(z.toJSONSchema(Advice)) },
-      },
-    },
-  );
+  const data = await geminiCall(apiKey, input);
   const candidate = (data.candidates || [])[0];
   if (!candidate) {
     const reason = data.promptFeedback && data.promptFeedback.blockReason;

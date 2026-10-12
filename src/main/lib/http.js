@@ -29,7 +29,7 @@ async function request(url, { method, headers = {}, form, json, body } = {}) {
   const res = await fetch(url, { method: verb, headers: h, body });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`${label(verb, url)} a répondu ${res.status} : ${text.slice(0, 600)}`);
+    throw Object.assign(new Error(`${label(verb, url)} a répondu ${res.status} : ${text.slice(0, 600)}`), { status: res.status });
   }
   return { status: res.status, headers: res.headers, data: parse(text) };
 }
