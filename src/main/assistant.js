@@ -3,6 +3,7 @@ const { Anthropic } = require('@anthropic-ai/sdk');
 const { betaZodOutputFormat } = require('@anthropic-ai/sdk/helpers/beta/zod');
 const { request, sleep } = require('./lib/http');
 const { Advice, SYSTEM, adviceMessage, categoryOf, geminiSchema } = require('./lib/advice');
+const { Review, REVIEW_SYSTEM, reviewMessage } = require('./lib/review');
 
 const CLAUDE_MODEL = 'claude-opus-5-5';
 // Modèles gratuits, du meilleur au plus léger : on descend quand l'un est saturé ou a épuisé son quota.
@@ -18,7 +19,9 @@ function explain(error) {
   return error.message;
 }
 
-async function claude(apiKey, input) {
+// Une demande est un triplet { system, message, schema } : la consigne, le texte de
+// l'utilisateur et le schéma zod de la réponse attendue.
+async function claude(apiKey, { system, message, schema }) {
   const client = new Anthropic({ apiKey });
   let response;
   try {
@@ -28,23 +31,23 @@ async function claude(apiKey, input) {
       // Si le modèle décline la demande, Anthropic la rejoue sur son modèle de repli.
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-      system: SYSTEM,
-      messages: [{ role: 'user', content: adviceMessage(input) }],
-      output_config: { effort: 'medium', format: betaZodOutputFormat(Advice) },
+      system,
+      messages: [{ role: 'user', content: message }],
+      output_config: { effort: 'medium', format: betaZodOutputFormat(schema) },
     });
   } catch (e) {
     throw new Error(explain(e));
   }
-  if (response.stop_reason === 'refusal') throw new Error("L'assistant a décliné cette demande. Reformule la description de la vidéo.");
+  if (response.stop_reason === 'refusal') throw new Error("L'assistant a décliné cette demande.");
   if (!response.parsed_output) throw new Error("La réponse de l'assistant est incomplète. Réessaie.");
   return response.parsed_output;
 }
 
-async function geminiCall(apiKey, input) {
+async function geminiCall(apiKey, { system, message, schema }) {
   const json = {
-    systemInstruction: { parts: [{ text: SYSTEM }] },
-    contents: [{ role: 'user', parts: [{ text: adviceMessage(input) }] }],
-    generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(z.toJSONSchema(Advice)) },
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts: [{ text: message }] }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(z.toJSONSchema(schema)) },
   };
   for (const model of GEMINI_MODELS) {
     try {
@@ -58,12 +61,12 @@ async function geminiCall(apiKey, input) {
   throw new Error('Gemini est saturé ou ton quota gratuit du jour est épuisé. Réessaie dans quelques minutes.');
 }
 
-async function gemini(apiKey, input) {
-  const data = await geminiCall(apiKey, input);
+async function gemini(apiKey, demand) {
+  const data = await geminiCall(apiKey, demand);
   const candidate = (data.candidates || [])[0];
   if (!candidate) {
     const reason = data.promptFeedback && data.promptFeedback.blockReason;
-    throw new Error(`Gemini n'a rien répondu${reason ? ` (${reason})` : ''}. Reformule la description de la vidéo.`);
+    throw new Error(`Gemini n'a rien répondu${reason ? ` (${reason})` : ''}.`);
   }
   // Les passages de réflexion du modèle arrivent dans la même liste, marqués `thought`.
   const text = ((candidate.content && candidate.content.parts) || [])
@@ -71,7 +74,7 @@ async function gemini(apiKey, input) {
     .map((p) => p.text)
     .join('');
   try {
-    return Advice.parse(JSON.parse(text));
+    return demand.schema.parse(JSON.parse(text));
   } catch {
     throw new Error(`La réponse de Gemini est incomplète (${candidate.finishReason || 'raison inconnue'}). Réessaie.`);
   }
@@ -85,9 +88,15 @@ const PROVIDERS = {
 const providerOf = (config) => PROVIDERS[config.provider] || PROVIDERS.gemini;
 const configured = (config) => Boolean(config[providerOf(config).key]);
 
-async function advise(config, input) {
+function ask(config, demand) {
   const provider = providerOf(config);
-  const advice = await provider.run(config[provider.key], input);
+  return provider.run(config[provider.key], demand);
+}
+
+const review = (config, input) => ask(config, { system: REVIEW_SYSTEM, message: reviewMessage(input), schema: Review });
+
+async function advise(config, input) {
+  const advice = await ask(config, { system: SYSTEM, message: adviceMessage(input), schema: Advice });
   // Aucun des deux schémas ne borne la catégorie à la liste : une valeur inconnue retombe sur celle par défaut.
   return { ...advice, categoryId: categoryOf(advice.categoryId) };
 }
@@ -118,4 +127,4 @@ const settings = {
   ],
 };
 
-module.exports = { advise, configured, settings };
+module.exports = { advise, review, configured, settings };

@@ -11,6 +11,7 @@ const state = {
   results: {},
   busy: false,
   categories: [],
+  stats: [],
   assistant: null,
   advice: null,
 };
@@ -359,6 +360,7 @@ async function loadStats() {
   $('stats-error').hidden = true;
   try {
     const list = await api.stats();
+    state.stats = list;
     $('stats').replaceChildren(...list.flatMap(statsSection));
     statsLoaded = true;
   } catch (e) {
@@ -368,6 +370,67 @@ async function loadStats() {
   button.disabled = false;
   button.textContent = 'Actualiser';
 }
+
+// Analyse des statistiques par l'assistant. Un titre proposé n'est appliqué que sur un clic.
+function retitleNode(proposal) {
+  const youtube = state.stats.find((p) => p.id === 'youtube');
+  const video = youtube && youtube.rows.find((row) => row.id === proposal.video);
+  // L'assistant peut citer un identifiant qui n'existe pas : la proposition est alors ignorée.
+  if (!video) return null;
+  const apply = el('button', { textContent: 'Renommer sur YouTube' });
+  const message = el('p', { className: 'bad', hidden: true });
+  apply.addEventListener('click', async () => {
+    apply.disabled = true;
+    message.hidden = true;
+    try {
+      await api.retitle(video.id, proposal.title);
+      apply.textContent = 'Renommée';
+      loadStats();
+    } catch (e) {
+      message.textContent = e.message;
+      message.hidden = false;
+      apply.disabled = false;
+    }
+  });
+  return el(
+    'div',
+    { className: 'retitle' },
+    el('p', { className: 'muted', textContent: `Actuel : ${video.title}` }),
+    el('p', {}, el('strong', { textContent: proposal.title })),
+    el('p', { className: 'muted', textContent: proposal.reason }),
+    apply,
+    message,
+  );
+}
+
+function renderReview(review) {
+  const list = (items, head) => el('ul', {}, ...items.map((item) => el('li', {}, el('strong', { textContent: item[head] }), ' ', item.text)));
+  const titles = review.retitles.map(retitleNode).filter(Boolean);
+  $('review').replaceChildren(
+    el('h3', { textContent: 'Ce que montrent tes chiffres' }),
+    list(review.insights, 'title'),
+    ...(review.words.length ? [el('h3', { textContent: 'Mots de ta niche à exploiter' }), list(review.words, 'word')] : []),
+    ...(titles.length ? [el('h3', { textContent: 'Titres à reprendre sur YouTube' }), ...titles] : []),
+  );
+  $('review').hidden = false;
+}
+
+$('stats-review').addEventListener('click', async () => {
+  const button = $('stats-review');
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Analyse en cours...';
+  $('stats-error').hidden = true;
+  try {
+    if (!statsLoaded) await loadStats();
+    renderReview(await api.review({ keywords: $('keywords').value, language: $('language').value }));
+  } catch (e) {
+    $('stats-error').textContent = e.message;
+    $('stats-error').hidden = false;
+  }
+  button.disabled = false;
+  button.textContent = label;
+});
 
 // Paramètres de l'assistant. L'affichage et la langue sont des préférences de l'interface ;
 // l'IA choisie et les clés partent dans le stockage chiffré.

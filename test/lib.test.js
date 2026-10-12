@@ -5,6 +5,7 @@ const { MB, tiktokPlan } = require('../src/main/lib/chunks');
 const { captionFor, warnings, lighterSize } = require('../src/main/lib/rules');
 const { adviceMessage, categoryOf, geminiSchema } = require('../src/main/lib/advice');
 const { keywordsOf, checklist } = require('../src/main/lib/score');
+const { reviewMessage } = require('../src/main/lib/review');
 
 test('challenge PKCE : vecteur de la RFC 7636 en base64url, même condensat en hex pour TikTok', () => {
   const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
@@ -122,4 +123,22 @@ test('lighterSize : rien pour une vidéo courte, une largeur paire sous le volum
   assert.ok(long.width * (long.width * 16 / 9) * 30 * 66 <= 1.9e9);
   // Une cadence élevée est ramenée à 30 images par seconde avant de toucher à la taille.
   assert.deepEqual(lighterSize({ ...hd, fps: 60, duration: 20 }), { width: 1080, fps: 30 });
+});
+
+test("reviewMessage : mes vidéos avec leur identifiant, la niche quand elle existe, la langue demandée", () => {
+  const own = [
+    { name: 'YouTube Shorts', rows: [{ id: 'abc', title: 'Mon titre', date: '2026-10-08T10:00:00Z', views: 543, likes: 5, comments: 4 }] },
+    { name: 'Instagram Reels', rows: [{ title: 'Un Reel', date: '2026-10-07T10:00:00Z', views: null, likes: 11, comments: 0 }] },
+    { name: 'TikTok', rows: [] },
+  ];
+  const bare = reviewMessage({ own, niche: [], keywords: '', language: '' });
+  assert.match(bare, /Mes dernières vidéos sur YouTube Shorts :\nid abc \| 2026-10-08 \| 543 vues \| 5 j'aime \| 4 commentaires \| Mon titre/);
+  assert.match(bare, /Instagram Reels :\n2026-10-07 \| \? vues \| 11 j'aime/);
+  assert.doesNotMatch(bare, /TikTok/);
+  assert.match(bare, /pas de données sur ma niche/);
+  const niche = [{ keyword: 'bomberman', videos: [{ title: 'Top', channel: 'Chaîne', views: 90000, tags: ['a', 'b'] }] }];
+  const full = reviewMessage({ own, niche, keywords: 'bomberman', language: 'en' });
+  assert.match(full, /pour « bomberman » :\n90000 vues \| Chaîne \| Top \| tags : a, b/);
+  assert.match(full, /nouveaux titres en anglais/);
+  assert.doesNotMatch(full, /pas de données sur ma niche/);
 });

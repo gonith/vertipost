@@ -6,8 +6,10 @@ const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPES = [
   'https://www.googleapis.com/auth/youtube.upload',
-  // Sert uniquement à afficher le nom de la chaîne connectée.
+  // Nom de la chaîne connectée, statistiques et recherche dans la niche.
   'https://www.googleapis.com/auth/youtube.readonly',
+  // Sert uniquement à renommer une vidéo déjà publiée, à la demande de l'utilisateur.
+  'https://www.googleapis.com/auth/youtube.force-ssl',
 ];
 
 const toTokens = (data, previous = {}) => ({
@@ -129,6 +131,7 @@ async function stats(ctx) {
   const count = (value) => (value === undefined ? null : Number(value));
   return {
     rows: (videos.data.items || []).map((v) => ({
+      id: v.id,
       title: v.snippet.title,
       url: `https://www.youtube.com/watch?v=${v.id}`,
       date: v.snippet.publishedAt,
@@ -137,6 +140,57 @@ async function stats(ctx) {
       comments: count(v.statistics.commentCount),
     })),
   };
+}
+
+// Les vidéos courtes les plus vues des six derniers mois pour chaque mot-clé. Une recherche
+// coûte 100 unités du quota journalier de 10 000 : on se limite aux premiers mots-clés.
+const NICHE_KEYWORDS = 3;
+const NICHE_VIDEOS = 8;
+const SIX_MONTHS = 182 * 24 * 3600 * 1000;
+
+async function niche(ctx, keywords) {
+  const headers = { Authorization: `Bearer ${await accessToken(ctx)}` };
+  const after = new Date(Date.now() - SIX_MONTHS).toISOString();
+  return Promise.all(
+    keywords.slice(0, NICHE_KEYWORDS).map(async (keyword) => {
+      const query = new URLSearchParams({ part: 'snippet', type: 'video', videoDuration: 'short', order: 'viewCount', maxResults: String(NICHE_VIDEOS), publishedAfter: after, q: keyword });
+      const found = await request(`${DATA}/search?${query}`, { headers });
+      const ids = (found.data.items || []).map((item) => item.id.videoId).filter(Boolean);
+      if (!ids.length) return { keyword, videos: [] };
+      const videos = await request(`${DATA}/videos?part=snippet,statistics&id=${ids.join(',')}`, { headers });
+      return {
+        keyword,
+        videos: (videos.data.items || []).map((v) => ({
+          title: v.snippet.title,
+          channel: v.snippet.channelTitle,
+          views: Number(v.statistics.viewCount || 0),
+          tags: v.snippet.tags || [],
+        })),
+      };
+    }),
+  );
+}
+
+// Renomme une vidéo. YouTube remplace tout le bloc descriptif à la mise à jour : on le relit
+// donc pour renvoyer la description, la catégorie et les tags tels quels.
+async function retitle(ctx, id, title) {
+  const headers = { Authorization: `Bearer ${await accessToken(ctx)}` };
+  const current = await request(`${DATA}/videos?part=snippet&id=${encodeURIComponent(id)}`, { headers });
+  const video = current.data.items && current.data.items[0];
+  if (!video) throw new Error('Vidéo introuvable sur ta chaîne.');
+  const { description, categoryId, tags, defaultLanguage } = video.snippet;
+  try {
+    await request(`${DATA}/videos?part=snippet`, {
+      method: 'PUT',
+      headers,
+      json: { id, snippet: { title, description, categoryId, tags, defaultLanguage } },
+    });
+  } catch (e) {
+    if (e.status === 403) {
+      throw new Error('Pour renommer une vidéo, déconnecte puis reconnecte YouTube : une autorisation de plus est nécessaire.');
+    }
+    throw e;
+  }
 }
 
 module.exports = {
@@ -157,4 +211,6 @@ module.exports = {
   connect,
   publish,
   stats,
+  niche,
+  retitle,
 };

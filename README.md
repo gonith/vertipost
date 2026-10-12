@@ -40,11 +40,16 @@ L'onglet **Statistiques** liste les quinze dernières vidéos de la chaîne YouT
 Instagram avec leurs vues, mentions J'aime et commentaires, plus les partages et enregistrements
 sur Instagram. TikTok n'y figure pas : en mode assisté, Vertipost n'a pas accès à son API.
 
+**Analyser avec l'assistant** lui soumet ces chiffres, plus les vidéos courtes les plus vues sur
+YouTube pour tes mots-clés de niche (une recherche par mot-clé, trois au plus, prises sur le quota
+YouTube). Il en tire des constats, des mots à exploiter et des titres à reprendre, qu'un bouton
+permet d'appliquer sur YouTube. Instagram ne permet pas de modifier une légende par son API.
+
 ## Organisation du code
 
 - `src/main/platforms/` : une plateforme par fichier, avec la même forme (`connect`, `publish`).
 - `src/main/oauth.js` : connexion par le navigateur, retour sur `127.0.0.1:8765`.
-- `src/main/assistant.js` : appel à Gemini ou à Claude ; la consigne et le schéma de réponse sont dans `src/main/lib/advice.js`.
+- `src/main/assistant.js` : appel à Gemini ou à Claude ; les consignes et les schémas de réponse sont dans `src/main/lib/advice.js` (propositions) et `src/main/lib/review.js` (analyse).
 - `src/main/store.js` : identifiants et jetons chiffrés.
 - `src/main/lib/` : logique sans dépendance à Electron, couverte par `test/`.
 - `src/renderer/` : l'interface.

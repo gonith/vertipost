@@ -7,7 +7,8 @@ const { inspect } = require('./video');
 const { warnings, captionFor } = require('./lib/rules');
 const { CATEGORIES, DEFAULT_CATEGORY } = require('./lib/advice');
 const assistant = require('./assistant');
-const { checklist } = require('./lib/score');
+const { checklist, keywordsOf } = require('./lib/score');
+const { LIMITS } = require('./lib/rules');
 
 // Node ne lit pas le magasin de certificats de Windows. Sur un poste où un antivirus
 // re-signe le HTTPS (Avast, Kaspersky...), toutes les requêtes échoueraient en
@@ -139,13 +140,35 @@ function stats() {
       if (!p.stats) return { ...base, note: "Vertipost n'a pas accès aux statistiques de cette plateforme : consulte-les dans son application." };
       if (!saved.tokens) return { ...base, note: 'Compte non connecté.' };
       try {
-        const ctx = { config: saved.config, tokens: saved.tokens, saveTokens: (tokens) => store.update(p.id, { tokens }) };
-        return { ...base, ...(await p.stats(ctx)) };
+        return { ...base, ...(await p.stats(context(p.id, saved))) };
       } catch (e) {
         return { ...base, error: e.message };
       }
     }),
   );
+}
+
+const context = (id, saved) => ({ config: saved.config, tokens: saved.tokens, saveTokens: (tokens) => store.update(id, { tokens }) });
+
+// L'analyse part des statistiques affichées, complétées par une recherche YouTube dans la niche
+// quand la chaîne est connectée et que des mots-clés sont renseignés.
+async function review({ keywords, language }) {
+  const config = assistantConfig();
+  if (!assistant.configured(config)) throw new Error("Renseigne d'abord la clé API de l'assistant, dans l'onglet Paramètres.");
+  const own = await stats();
+  if (!own.some((p) => p.rows.length)) throw new Error("Aucune vidéo à analyser : connecte YouTube ou Instagram.");
+  const youtube = store.load().youtube || {};
+  const words = keywordsOf(keywords);
+  const niche = youtube.tokens && words.length ? await platform('youtube').niche(context('youtube', youtube), words) : [];
+  return assistant.review(config, { own, niche, keywords, language });
+}
+
+function retitle(id, title) {
+  const youtube = store.load().youtube || {};
+  if (!youtube.tokens) throw new Error('Compte non connecté.');
+  const clean = (title || '').trim();
+  if (!clean || clean.length > LIMITS.youtube.title) throw new Error(`Le titre doit faire entre 1 et ${LIMITS.youtube.title} caractères.`);
+  return platform('youtube').retitle(context('youtube', youtube), id, clean);
 }
 
 // Une erreur levée dans un gestionnaire arrive côté interface préfixée par Electron
@@ -189,6 +212,8 @@ handle('check', (_e, post, info) =>
 handle('publish', (event, request) => publish(event.sender, request));
 handle('score', (_e, post, keywords) => checklist({ title: post.title, caption: post.caption, keywords }));
 handle('stats', () => stats());
+handle('review', (_e, input) => review(input));
+handle('retitle', (_e, id, title) => retitle(id, title));
 handle('categories', () => ({ list: CATEGORIES, initial: DEFAULT_CATEGORY }));
 handle('assistant:state', () => describeAssistant());
 handle('assistant:save', (_e, values) => {

@@ -36,6 +36,13 @@ body {
 .stats td button { border: none; background: none; padding: 0; color: var(--text); text-align: left; }
 .stats td button:hover { color: var(--accent); }
 
+.review { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px 16px 14px; margin-top: 12px; font-size: 13px; }
+.review ul { margin: 0; padding-left: 18px; }
+.review li { margin-bottom: 6px; }
+.review .retitle { border-top: 1px solid var(--line); padding: 10px 0; }
+.review .retitle p { margin: 2px 0; }
+.review .retitle button { margin-top: 6px; }
+
 .settings { max-width: 720px; padding: 8px 24px 24px; }
 .settings ol { padding-left: 18px; color: var(--muted); font-size: 13px; }
 .settings li { margin-bottom: 4px; }
