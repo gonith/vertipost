@@ -8,6 +8,7 @@ const { warnings, captionFor } = require('./lib/rules');
 const { CATEGORIES, DEFAULT_CATEGORY } = require('./lib/advice');
 const assistant = require('./assistant');
 const { checklist } = require('./lib/score');
+const schedule = require('./schedule');
 
 // Node ne lit pas le magasin de certificats de Windows. Sur un poste où un antivirus
 // re-signe le HTTPS (Avast, Kaspersky...), toutes les requêtes échoueraient en
@@ -100,7 +101,7 @@ async function connect(id) {
   store.update(id, { tokens, account });
 }
 
-async function publish(sender, { filePath, post, targets }) {
+async function publish(notify, { filePath, post, targets }) {
   const video = await inspect(filePath);
   const data = store.load();
   const one = async (id) => {
@@ -114,7 +115,7 @@ async function publish(sender, { filePath, post, targets }) {
       video,
       post,
       caption: captionFor(id, post),
-      progress: (phase, fraction) => sender.send('progress', { id, phase, fraction }),
+      progress: (phase, fraction) => notify('progress', { id, phase, fraction }),
     });
   };
   // Une plateforme qui échoue ne doit pas retenir les autres.
@@ -164,7 +165,21 @@ handle('video:inspect', (_e, filePath) => inspect(filePath));
 handle('check', (_e, post, info) =>
   Object.fromEntries(platforms.map((p) => [p.id, warnings(p.id, post, info)])),
 );
-handle('publish', (event, request) => publish(event.sender, request));
+handle('publish', (event, request) => publish((channel, payload) => event.sender.send(channel, payload), request));
+handle('schedule:list', () => schedule.list());
+handle('schedule:add', async (_e, request) => {
+  await inspect(request.filePath);
+  schedule.add(request);
+  return schedule.list();
+});
+handle('schedule:remove', (_e, id) => {
+  schedule.remove(id);
+  return schedule.list();
+});
+handle('schedule:run', (_e, id) => {
+  schedule.runNow(id);
+  return schedule.list();
+});
 handle('score', (_e, post, keywords) => checklist({ title: post.title, caption: post.caption, keywords }));
 handle('categories', () => ({ list: CATEGORIES, initial: DEFAULT_CATEGORY }));
 handle('assistant:state', () => describeAssistant());
@@ -189,6 +204,20 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js') },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  // Fermer la fenêtre quitte l'application, et avec elle les publications programmées.
+  win.on('close', (e) => {
+    const count = schedule.pending();
+    if (!count) return;
+    const choice = dialog.showMessageBoxSync(win, {
+      type: 'warning',
+      buttons: ['Garder Vertipost ouvert', 'Quitter quand même'],
+      defaultId: 0,
+      cancelId: 0,
+      message: count === 1 ? 'Une publication est programmée.' : `${count} publications sont programmées.`,
+      detail: "Elles ne partiront que si Vertipost est ouvert à l'heure prévue. Tu peux réduire la fenêtre au lieu de la fermer.",
+    });
+    if (choice === 0) e.preventDefault();
+  });
   // Rien ne navigue dans la fenêtre : un lien sort dans le navigateur ou n'aboutit pas.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
@@ -197,5 +226,7 @@ function createWindow() {
 app.whenReady().then(() => {
   trustSystemCertificates();
   createWindow();
+  // Une publication programmée n'a pas de carte où afficher sa progression.
+  schedule.start((request) => publish(() => {}, request));
 });
 app.on('window-all-closed', () => app.quit());

@@ -5,6 +5,7 @@ const { MB, fixedChunks, tiktokPlan } = require('../src/main/lib/chunks');
 const { captionFor, warnings } = require('../src/main/lib/rules');
 const { adviceMessage, categoryOf, geminiSchema } = require('../src/main/lib/advice');
 const { keywordsOf, checklist } = require('../src/main/lib/score');
+const { GRACE_MS, split } = require('../src/main/lib/schedule');
 
 test('challenge PKCE : vecteur de la RFC 7636 en base64url, même condensat en hex pour TikTok', () => {
   const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
@@ -107,4 +108,13 @@ test('checklist : signale chaque manque', () => {
   const long = `${'x'.repeat(50)} bomb arena ${'x'.repeat(20)}`;
   const rules = checklist({ title: long, caption: '#bombarena en premier', keywords: 'bomb arena' });
   assert.deepEqual(rules.map((r) => r.ok), [true, true, false, false, false, false, false, true]);
+});
+
+test('split : une programmation en retard part dans le délai toléré, sinon elle est manquée', () => {
+  const now = 1_000_000_000;
+  const job = (id, at, status = 'pending') => ({ id, at, status });
+  const jobs = [job('futur', now + 1), job('pile', now), job('limite', now - GRACE_MS), job('tard', now - GRACE_MS - 1), job('faite', now - 5, 'done')];
+  const { due, missed } = split(jobs, now);
+  assert.deepEqual(due.map((j) => j.id), ['pile', 'limite']);
+  assert.deepEqual(missed.map((j) => j.id), ['tard']);
 });
