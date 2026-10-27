@@ -244,6 +244,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   trustSystemCertificates();
+  store.seed();
   createWindow();
 });
 app.on('window-all-closed', () => app.quit());

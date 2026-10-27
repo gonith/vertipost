@@ -18,7 +18,16 @@
     "win": {
       "target": "nsis",
       "icon": "assets/icon.png"
-    }
+    },
+    "extraResources": [
+      {
+        "from": ".",
+        "to": ".",
+        "filter": [
+          "preset.json"
+        ]
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^44.6.0",
