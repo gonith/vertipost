@@ -9,10 +9,11 @@ Compte environ 15 minutes la première fois.
 --------------------
 
 a) Accepter l'invitation Meta (pour Instagram)
-   Tu as été ajouté comme testeur de l'application Vertipost.
-   - Connecte-toi à ton compte Facebook.
+   - Connecte-toi à ton compte Facebook, ouvre https://developers.facebook.com et clique sur "Commencer"
+     pour créer un compte développeur Meta (gratuit, ne sert qu'à ça). Sans lui, tu ne peux pas être ajouté.
+   - Donne ensuite ton nom ou identifiant Facebook à la personne qui t'a envoyé Vertipost : elle t'ajoute
+     comme testeur de l'application.
    - Ouvre https://developers.facebook.com/requests et accepte l'invitation "Vertipost".
-   - Si Facebook te demande de créer un compte développeur, accepte : c'est gratuit et ne sert qu'à ça.
 
 b) Passer ton Instagram en compte professionnel
    Instagram n'autorise la publication par une application que sur un compte Créateur ou Entreprise,
