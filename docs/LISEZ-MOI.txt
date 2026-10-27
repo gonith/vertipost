@@ -1,0 +1,85 @@
+﻿VERTIPOST - PRISE EN MAIN
+=========================
+
+Vertipost publie une vidéo verticale sur YouTube Shorts, Instagram Reels et TikTok en une fois.
+Compte environ 15 minutes la première fois.
+
+
+1. AVANT D'INSTALLER
+--------------------
+
+a) Accepter l'invitation Meta (pour Instagram)
+   Tu as été ajouté comme testeur de l'application Vertipost.
+   - Connecte-toi à ton compte Facebook.
+   - Ouvre https://developers.facebook.com/requests et accepte l'invitation "Vertipost".
+   - Si Facebook te demande de créer un compte développeur, accepte : c'est gratuit et ne sert qu'à ça.
+
+b) Passer ton Instagram en compte professionnel
+   Instagram n'autorise la publication par une application que sur un compte Créateur ou Entreprise,
+   relié à une Page Facebook.
+   - Dans l'application Instagram : Profil > menu ☰ > Type de compte et outils >
+     Passer à un compte professionnel (Créateur convient très bien).
+   - Crée une Page Facebook si tu n'en as pas (Facebook > menu > Pages > Créer).
+   - Relie-les : paramètres de ta Page Facebook > Comptes liés > Instagram > Connecter.
+
+
+2. INSTALLER
+------------
+
+- Lance "Vertipost Setup 0.1.0.exe".
+- Windows affiche "Windows a protégé votre ordinateur" : l'application n'est simplement pas signée.
+  Clique sur "Informations complémentaires" puis "Exécuter quand même".
+- Vertipost s'ouvre et ajoute un raccourci sur le Bureau.
+
+Les identifiants de l'application sont déjà remplis : tu n'as rien à saisir dans les boutons "Configurer".
+
+
+3. CONNECTER TES COMPTES
+------------------------
+
+Dans l'onglet "Publier", chaque plateforme a sa carte avec un bouton "Connecter".
+Ton navigateur s'ouvre ; une fois la connexion acceptée, reviens dans Vertipost.
+
+- YouTube : choisis le compte Google de ta chaîne. Google affiche "Google n'a pas validé cette application" :
+  clique sur "Paramètres avancés" puis "Accéder à Vertipost (non sécurisé)",
+  et COCHE TOUTES LES AUTORISATIONS.
+
+- Instagram : connecte-toi avec le compte Facebook qui gère ta Page, et sélectionne ta Page et ton compte
+  Instagram quand Facebook les propose.
+
+- TikTok : rien à connecter. Au moment de publier, Vertipost ouvre la page d'envoi de TikTok Studio,
+  montre ta vidéo dans l'Explorateur et copie la légende. Tu glisses la vidéo, tu colles la légende (Ctrl+V)
+  et tu publies. Connecte-toi une fois à https://www.tiktok.com/tiktokstudio/upload dans ton navigateur
+  pour que ça aille vite.
+
+
+4. L'ASSISTANT (FACULTATIF)
+---------------------------
+
+Il propose un titre, une catégorie et des légendes à partir d'une description de ta vidéo.
+Il lui faut une clé Gemini, gratuite :
+- Ouvre https://aistudio.google.com/apikey avec ton compte Google et clique sur "Créer une clé API".
+- Dans Vertipost, onglet "Paramètres", colle la clé et clique sur "Enregistrer".
+Garde cette clé pour toi : elle est liée à ton compte Google.
+
+
+5. PUBLIER
+----------
+
+- Onglet "Publier" : choisis ta vidéo verticale.
+- Écris le titre et la légende, ou décris ta vidéo et laisse l'assistant proposer,
+  puis "Appliquer au formulaire".
+- Remplis "Mots-clés de ta niche" : la grille Pertinence et l'assistant s'en servent.
+- Coche les plateformes et clique sur "Publier".
+
+
+À SAVOIR
+--------
+
+- Les vidéos YouTube sont publiées EN PRIVÉ tant que l'application n'a pas passé l'audit de YouTube :
+  c'est une règle de Google pour les applications non auditées. Instagram et TikTok publient normalement.
+- La connexion Instagram est à refaire environ tous les 60 jours : Vertipost te le dira.
+- L'onglet "Statistiques" montre les vues et interactions de tes dernières vidéos YouTube et Instagram.
+- Tes comptes et tes clés restent sur ton ordinateur, chiffrés par Windows.
+  Confidentialité : https://gonith.github.io/vertipost/privacy.html
+- Ne partage pas l'installateur : il contient les identifiants de l'application.
