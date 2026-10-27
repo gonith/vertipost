@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vertipost – Confidentialité</title>
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <nav>
+    <a href="./">Accueil</a>
+    <a href="privacy.html">Confidentialité / Privacy</a>
+    <a href="terms.html">Conditions / Terms</a>
+  </nav>
+
+  <h1>Règles de confidentialité</h1>
+  <p class="muted">Dernière mise à jour : 27 octobre 2026 · <a href="#en">English version below</a></p>
+
+  <p>Vertipost est une application de bureau pour Windows. Elle n'a pas de serveur : son éditeur ne reçoit, ne stocke et ne
+  consulte aucune donnée de ses utilisateurs. Cette page décrit ce que l'application fait des données sur l'ordinateur où
+  elle est installée.</p>
+
+  <h2>Données auxquelles Vertipost accède</h2>
+  <h3>YouTube (services d'API YouTube de Google)</h3>
+  <p>Quand l'utilisateur connecte sa chaîne, Vertipost demande l'autorisation de :</p>
+  <ul>
+    <li>mettre en ligne les vidéos que l'utilisateur choisit de publier, avec le titre, la description et la catégorie qu'il a saisis ;</li>
+    <li>lire la liste de ses dernières vidéos et leurs statistiques (vues, mentions J'aime, commentaires) pour les afficher dans l'onglet Statistiques ;</li>
+    <li>modifier le titre d'une de ses vidéos, uniquement quand l'utilisateur clique sur « Renommer sur YouTube » ;</li>
+    <li>rechercher des vidéos publiques sur YouTube à partir des mots-clés que l'utilisateur a saisis.</li>
+  </ul>
+  <h3>Instagram (Meta)</h3>
+  <p>Vertipost publie les Reels que l'utilisateur choisit sur le compte Instagram professionnel qu'il connecte, et lit les
+  statistiques de ses dernières publications.</p>
+  <h3>TikTok</h3>
+  <p>Par défaut, Vertipost n'utilise pas l'API de TikTok : il ouvre la page d'envoi de TikTok Studio dans le navigateur et
+  copie la légende dans le presse-papiers. Si l'utilisateur active un mode API, Vertipost envoie la vidéo choisie sur son compte TikTok.</p>
+
+  <h2>Utilisation des données</h2>
+  <p>Ces données servent uniquement aux fonctions que l'utilisateur déclenche lui-même dans l'application : publier, afficher
+  ses statistiques, renommer une vidéo. Elles ne sont ni vendues, ni partagées avec des tiers, ni utilisées à des fins
+  publicitaires.</p>
+  <p>L'utilisation et le transfert des informations reçues des API Google respectent les
+  <a href="https://developers.google.com/terms/api-services-user-data-policy">règles relatives aux données utilisateur des services d'API Google</a>,
+  y compris les exigences d'utilisation limitée.</p>
+
+  <h2>Assistant (facultatif)</h2>
+  <p>Si l'utilisateur active l'assistant et y enregistre sa propre clé, Vertipost envoie au fournisseur d'IA qu'il a choisi
+  (Google Gemini ou Anthropic Claude) la description de la vidéo, les mots-clés saisis et, pour l'analyse, les titres et
+  statistiques de ses dernières vidéos. Ces envois sont soumis aux règles de confidentialité de ce fournisseur. Sans clé,
+  rien n'est envoyé.</p>
+
+  <h2>Stockage et sécurité</h2>
+  <p>Les jetons d'accès, identifiants et clés sont enregistrés sur l'ordinateur de l'utilisateur, dans le dossier
+  <code>%APPDATA%\vertipost</code>, chiffrés par Windows (DPAPI). Ils ne transitent que vers les plateformes concernées,
+  par des connexions chiffrées (HTTPS). Vertipost ne contient aucun outil de mesure d'audience ni de suivi.</p>
+
+  <h2>Suppression et révocation</h2>
+  <ul>
+    <li>Le bouton « Déconnecter » de chaque plateforme supprime ses jetons de l'ordinateur.</li>
+    <li>Désinstaller Vertipost et supprimer le dossier <code>%APPDATA%\vertipost</code> efface toutes ses données.</li>
+    <li>L'accès à un compte Google peut être révoqué à tout moment sur la page
+      <a href="https://myaccount.google.com/permissions">Applications tierces de votre compte Google</a>.</li>
+    <li>L'accès Instagram se révoque dans les paramètres Facebook, rubrique « Intégrations professionnelles ».</li>
+  </ul>
+
+  <h2>Règles des plateformes</h2>
+  <p>En connectant YouTube, l'utilisateur accepte les
+  <a href="https://www.youtube.com/t/terms">Conditions d'utilisation de YouTube</a>, et ses données sont aussi soumises aux
+  <a href="https://policies.google.com/privacy">Règles de confidentialité de Google</a>.</p>
+
+  <h2>Contact</h2>
+  <p>Pour toute question : <a href="https://github.com/gonith/vertipost/issues">github.com/gonith/vertipost/issues</a>.</p>
+
+  <hr>
+
+  <section id="en" lang="en">
+    <h1>Privacy Policy</h1>
+    <p class="muted">Last updated: October 27, 2026</p>
+
+    <p>Vertipost is a Windows desktop application. It has no server: its publisher does not receive, store or access any
+    user data. This page describes what the application does with data on the computer where it is installed.</p>
+
+    <h2>Data Vertipost accesses</h2>
+    <h3>YouTube (YouTube API Services by Google)</h3>
+    <p>When the user connects a channel, Vertipost asks for permission to:</p>
+    <ul>
+      <li>upload the videos the user chooses to publish, with the title, description and category they entered;</li>
+      <li>read the list of their latest videos and their statistics (views, likes, comments) to show them in the Statistics tab;</li>
+      <li>change the title of one of their videos, only when the user clicks “Rename on YouTube”;</li>
+      <li>search public YouTube videos for keywords the user entered.</li>
+    </ul>
+    <h3>Instagram (Meta)</h3>
+    <p>Vertipost publishes the Reels the user chooses to the professional Instagram account they connect, and reads the
+    statistics of their latest posts.</p>
+    <h3>TikTok</h3>
+    <p>By default Vertipost does not use the TikTok API: it opens the TikTok Studio upload page in the browser and copies the
+    caption to the clipboard. If the user enables an API mode, Vertipost uploads the chosen video to their TikTok account.</p>
+
+    <h2>How data is used</h2>
+    <p>This data is used only for the features the user triggers in the application: publishing, showing their statistics,
+    renaming a video. It is not sold, shared with third parties or used for advertising.</p>
+    <p>Vertipost's use and transfer of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+    including the Limited Use requirements.</p>
+
+    <h2>Assistant (optional)</h2>
+    <p>If the user enables the assistant and saves their own key, Vertipost sends to the AI provider they chose (Google
+    Gemini or Anthropic Claude) the video description, the keywords entered and, for the analysis, the titles and
+    statistics of their latest videos. These requests are subject to that provider's privacy policy. Without a key,
+    nothing is sent.</p>
+
+    <h2>Storage and security</h2>
+    <p>Access tokens, credentials and keys are stored on the user's computer, in the <code>%APPDATA%\vertipost</code>
+    folder, encrypted by Windows (DPAPI). They are only sent to the platforms concerned, over encrypted connections (HTTPS).
+    Vertipost contains no analytics or tracking.</p>
+
+    <h2>Deletion and revocation</h2>
+    <ul>
+      <li>The “Disconnect” button of each platform deletes its tokens from the computer.</li>
+      <li>Uninstalling Vertipost and deleting the <code>%APPDATA%\vertipost</code> folder erases all its data.</li>
+      <li>Access to a Google account can be revoked at any time on the
+        <a href="https://myaccount.google.com/permissions">Google Account third-party apps page</a>.</li>
+      <li>Instagram access is revoked in Facebook settings, under “Business integrations”.</li>
+    </ul>
+
+    <h2>Platform policies</h2>
+    <p>By connecting YouTube, the user agrees to the <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>,
+    and their data is also subject to the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</p>
+
+    <h2>Contact</h2>
+    <p>Questions: <a href="https://github.com/gonith/vertipost/issues">github.com/gonith/vertipost/issues</a>.</p>
+  </section>
+</main>
+</body>
+</html>
