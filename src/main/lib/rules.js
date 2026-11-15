@@ -3,6 +3,7 @@
 const LIMITS = {
   youtube: { title: 100, caption: 5000, seconds: 180 },
   instagram: { caption: 2200, seconds: 900 },
+  facebook: { caption: 2200, seconds: 90 },
   tiktok: { caption: 2200, seconds: 600 },
 };
 

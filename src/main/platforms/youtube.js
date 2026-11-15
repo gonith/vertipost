@@ -26,7 +26,8 @@ async function connect(config) {
       response_type: 'code',
       scope: SCOPES.join(' '),
       access_type: 'offline',
-      prompt: 'consent',
+      // Le choix du compte reste proposé : chaque profil peut avoir sa propre chaîne.
+      prompt: 'select_account consent',
     },
     redirectUri: REDIRECT,
   });

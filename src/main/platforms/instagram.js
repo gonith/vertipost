@@ -1,15 +1,12 @@
-const { authorize, PORT } = require('../oauth');
 const fs = require('fs');
 const { request, sendFile, sleep } = require('../lib/http');
 const { faststart, lighten } = require('../video');
 const { lighterSize } = require('../lib/rules');
+const meta = require('./meta');
 
 // L'envoi d'un fichier local (« resumable upload ») n'existe que derrière Facebook Login for
 // Business : le compte Instagram doit être professionnel ET rattaché à une Page Facebook.
-// Meta n'accepte un retour en http que sur « localhost », et seulement en mode développement.
-const REDIRECT = `http://localhost:${PORT}/callback`;
-const VERSION = 'v26.0';
-const GRAPH = `https://graph.facebook.com/${VERSION}`;
+const { GRAPH } = meta;
 const SCOPES = [
   'instagram_basic',
   'instagram_content_publish',
@@ -20,41 +17,17 @@ const SCOPES = [
   'instagram_manage_insights',
 ];
 
-const query = (params) => new URLSearchParams(params).toString();
-
-async function connect(config) {
-  const { code } = await authorize({
-    authUrl: `https://www.facebook.com/${VERSION}/dialog/oauth`,
-    params: { client_id: config.clientId, response_type: 'code', scope: SCOPES.join(',') },
-    redirectUri: REDIRECT,
-    pkce: null,
-  });
-  const app = { client_id: config.clientId, client_secret: config.clientSecret };
-  const short = await request(`${GRAPH}/oauth/access_token?${query({ ...app, redirect_uri: REDIRECT, code })}`);
-  // Le jeton obtenu dure une heure ; on l'échange contre un jeton d'environ 60 jours.
-  const long = await request(
-    `${GRAPH}/oauth/access_token?${query({
-      ...app,
-      grant_type: 'fb_exchange_token',
-      fb_exchange_token: short.data.access_token,
-    })}`,
-  );
-  const access = long.data.access_token;
-  const pages = await request(
-    `${GRAPH}/me/accounts?${query({ fields: 'name,instagram_business_account{id,username}', access_token: access })}`,
-  );
-  const page = (pages.data.data || []).find((p) => p.instagram_business_account);
-  if (!page) {
+async function connect(config, { choose }) {
+  const { access, expiresAt } = await meta.login(config, SCOPES);
+  const linked = (await meta.pages(access, 'name,instagram_business_account{id,username}')).filter((p) => p.instagram_business_account);
+  if (!linked.length) {
     throw new Error(
       "Aucun compte Instagram professionnel n'est rattaché aux Pages Facebook autorisées. Passe le compte en Créateur ou Business et relie-le à une Page.",
     );
   }
+  const page = await meta.pick(linked, (p) => `@${p.instagram_business_account.username}`, choose, 'Quel compte Instagram relier à ce profil ?');
   return {
-    tokens: {
-      access,
-      expiresAt: Date.now() + (long.data.expires_in || 60 * 24 * 3600) * 1000,
-      igUserId: page.instagram_business_account.id,
-    },
+    tokens: { access, expiresAt, igUserId: page.instagram_business_account.id },
     account: `@${page.instagram_business_account.username}`,
   };
 }
@@ -189,17 +162,15 @@ async function stats({ tokens }) {
 module.exports = {
   id: 'instagram',
   name: 'Instagram Reels',
-  redirectUri: REDIRECT,
-  fields: [
-    { key: 'clientId', label: "ID de l'application" },
-    { key: 'clientSecret', label: 'Clé secrète', secret: true },
-  ],
+  redirectUri: meta.REDIRECT,
+  fields: meta.fields,
   consoleUrl: 'https://developers.facebook.com/apps/',
   help: [
     'Le compte Instagram doit être Créateur ou Business, et relié à une Page Facebook que tu gères.',
     'Crée une application de type « Business » sur Meta for Developers et ajoute le produit « Facebook Login for Business ».',
     "Laisse l'application en mode développement : c'est suffisant pour ton propre compte, et c'est ce qui autorise le retour sur localhost.",
     'La connexion dure environ 60 jours, puis il faut la refaire.',
+    'Ces identifiants servent aussi à Facebook : la même application Meta publie sur les deux.',
   ],
   connect,
   publish,

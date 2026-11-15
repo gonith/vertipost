@@ -1,7 +1,7 @@
 ﻿VERTIPOST - PRISE EN MAIN
 =========================
 
-Vertipost publie une vidéo verticale sur YouTube Shorts, Instagram Reels et TikTok en une fois.
+Vertipost publie une vidéo verticale sur YouTube Shorts, Instagram Reels, Facebook Reels et TikTok en une fois.
 Compte environ 15 minutes la première fois.
 
 
@@ -47,6 +47,12 @@ Ton navigateur s'ouvre ; une fois la connexion acceptée, reviens dans Vertipost
 
 - Instagram : connecte-toi avec le compte Facebook qui gère ta Page, et sélectionne ta Page et ton compte
   Instagram quand Facebook les propose.
+
+- Facebook : les Reels se publient sur une Page Facebook, pas sur un profil personnel. Clique sur Connecter
+  et choisis ta Page.
+
+- Plusieurs chaînes ? Dans "Paramètres", ajoute un profil par identité, puis choisis-le en haut à droite :
+  chaque profil a ses propres comptes connectés, ses mots-clés et ses statistiques.
 
 - TikTok : rien à connecter. Au moment de publier, Vertipost ouvre la page d'envoi de TikTok Studio,
   montre ta vidéo dans l'Explorateur et copie la légende. Tu glisses la vidéo, tu colles la légende (Ctrl+V)

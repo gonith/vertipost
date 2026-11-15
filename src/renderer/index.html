@@ -11,6 +11,8 @@
     <button id="tab-publish" class="tab">Publier</button>
     <button id="tab-stats" class="tab">Statistiques</button>
     <button id="tab-settings" class="tab">Paramètres</button>
+    <span class="grow"></span>
+    <label class="profile">Profil <select id="profile"></select></label>
   </nav>
 
   <main id="page-publish">
@@ -87,6 +89,15 @@
   </section>
 
   <section id="page-settings" class="settings" hidden>
+    <h2>Profils</h2>
+    <p class="muted">Chaque profil a ses propres comptes YouTube, Instagram et Facebook, ses mots-clés de niche et ses statistiques. Les identifiants d'application et l'assistant sont communs à tous les profils. Sur TikTok, la publication se fait sur le compte connecté dans ton navigateur.</p>
+    <ul id="profile-list" class="profiles"></ul>
+    <form id="profile-form" class="row">
+      <input id="profile-name" type="text" maxlength="40" placeholder="Nom du nouveau profil">
+      <button type="submit">Ajouter un profil</button>
+    </form>
+    <p id="profile-error" class="bad" hidden></p>
+
     <h2>Assistant par IA</h2>
     <label class="inline">
       <input id="assistant-enabled" type="checkbox">

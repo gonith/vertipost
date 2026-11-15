@@ -25,16 +25,22 @@ function platform(id) {
   return found;
 }
 
-// Ce que l'interface a le droit de voir : jamais un secret ni un jeton.
+// Identifiants d'application d'une plateforme : Facebook reprend ceux d'Instagram.
+const configOf = (p, data = store.load()) => (data[p.configFrom || p.id] || {}).config || {};
+
+// Ce que l'interface a le droit de voir : jamais un secret ni un jeton. Les comptes sont ceux
+// du profil actif.
 function describe() {
   const data = store.load();
+  const accounts = data.accounts[data.profiles.active] || {};
   return platforms.map((p) => {
-    const saved = data[p.id] || {};
-    const config = saved.config || {};
+    const saved = accounts[p.id] || {};
+    const config = configOf(p, data);
     return {
       id: p.id,
       name: p.name,
       redirectUri: p.redirectUri,
+      configFrom: p.configFrom || null,
       consoleUrl: p.consoleUrl,
       help: p.help,
       fields: p.fields.map((f) => ({
@@ -53,6 +59,7 @@ function describe() {
 
 function saveConfig(id, values) {
   const p = platform(id);
+  if (p.configFrom) return saveConfig(p.configFrom, values);
   const saved = store.load()[id] || {};
   const config = { ...saved.config };
   for (const field of p.fields) {
@@ -60,8 +67,11 @@ function saveConfig(id, values) {
     // Un champ secret laissé vide veut dire « ne change rien » : l'interface ne le réaffiche pas.
     if (value || !field.secret) config[field.key] = value;
   }
-  const sameApp = saved.config && saved.config.clientId === config.clientId;
-  store.update(id, sameApp ? { config } : { config, tokens: null, account: null });
+  store.update(id, { config });
+  // Une autre application rend caducs les comptes connectés avec l'ancienne, dans tous les profils.
+  if (!saved.config || saved.config.clientId !== config.clientId) {
+    for (const q of platforms) if ((q.configFrom || q.id) === id) store.forget(q.id);
+  }
 }
 
 const assistantConfig = () => (store.load().assistant || {}).config || {};
@@ -95,26 +105,34 @@ async function advise(input) {
   return assistant.advise(config, input);
 }
 
-async function connect(id) {
+// Quand une connexion autorise plusieurs comptes (des Pages, des comptes Instagram), l'utilisateur
+// choisit celui du profil.
+function chooser(win) {
+  return async (message, labels) => {
+    const { response } = await dialog.showMessageBox(win, { type: 'question', message, buttons: [...labels, 'Annuler'], cancelId: labels.length, noLink: true });
+    if (response === labels.length) throw new Error('Connexion annulée.');
+    return response;
+  };
+}
+
+async function connect(win, id) {
   const p = platform(id);
-  const saved = store.load()[id] || {};
-  if (!saved.config) throw new Error("Renseigne d'abord les identifiants de l'application.");
-  const { tokens, account } = await p.connect(saved.config);
-  store.update(id, { tokens, account });
+  const config = configOf(p);
+  if (!config.clientId) throw new Error("Renseigne d'abord les identifiants de l'application.");
+  const profile = store.profiles().active;
+  const { tokens, account } = await p.connect(config, { choose: chooser(win) });
+  store.setAccount(id, { tokens, account }, profile);
 }
 
 async function publish(sender, { filePath, post, targets }) {
   const video = await inspect(filePath);
-  const data = store.load();
+  const profile = store.profiles().active;
   const one = async (id) => {
     const p = platform(id);
-    const saved = data[id] || {};
-    const config = saved.config || {};
-    if (!saved.tokens && !(p.assisted && p.assisted(config))) throw new Error('Compte non connecté.');
+    const ctx = context(id, profile);
+    if (!ctx.tokens && !(p.assisted && p.assisted(ctx.config))) throw new Error('Compte non connecté.');
     return p.publish({
-      config,
-      tokens: saved.tokens,
-      saveTokens: (tokens) => store.update(id, { tokens }),
+      ...ctx,
       video,
       post,
       caption: captionFor(id, post),
@@ -132,15 +150,15 @@ async function publish(sender, { filePath, post, targets }) {
 
 // Une plateforme en panne ou déconnectée ne doit pas masquer les statistiques des autres.
 function stats() {
-  const data = store.load();
+  const profile = store.profiles().active;
   return Promise.all(
     platforms.map(async (p) => {
-      const saved = data[p.id] || {};
+      const ctx = context(p.id, profile);
       const base = { id: p.id, name: p.name, rows: [], note: null, error: null };
       if (!p.stats) return { ...base, note: "Vertipost n'a pas accès aux statistiques de cette plateforme : consulte-les dans son application." };
-      if (!saved.tokens) return { ...base, note: 'Compte non connecté.' };
+      if (!ctx.tokens) return { ...base, note: 'Compte non connecté.' };
       try {
-        return { ...base, ...(await p.stats(context(p.id, saved))) };
+        return { ...base, ...(await p.stats(ctx)) };
       } catch (e) {
         return { ...base, error: e.message };
       }
@@ -148,7 +166,15 @@ function stats() {
   );
 }
 
-const context = (id, saved) => ({ config: saved.config, tokens: saved.tokens, saveTokens: (tokens) => store.update(id, { tokens }) });
+// Ce qu'une plateforme reçoit pour agir sur le compte d'un profil. Le profil est fixé au départ :
+// un jeton renouvelé en cours de route revient au bon profil même si l'utilisateur en a changé.
+function context(id, profile) {
+  return {
+    config: configOf(platform(id)),
+    tokens: store.account(id, profile).tokens,
+    saveTokens: (tokens) => store.setAccount(id, { tokens }, profile),
+  };
+}
 
 // L'analyse part des statistiques affichées, complétées par une recherche YouTube dans la niche
 // quand la chaîne est connectée et que des mots-clés sont renseignés.
@@ -157,18 +183,18 @@ async function review({ keywords, language }) {
   if (!assistant.configured(config)) throw new Error("Renseigne d'abord la clé API de l'assistant, dans l'onglet Paramètres.");
   const own = await stats();
   if (!own.some((p) => p.rows.length)) throw new Error("Aucune vidéo à analyser : connecte YouTube ou Instagram.");
-  const youtube = store.load().youtube || {};
+  const youtube = context('youtube', store.profiles().active);
   const words = keywordsOf(keywords);
-  const niche = youtube.tokens && words.length ? await platform('youtube').niche(context('youtube', youtube), words) : [];
+  const niche = youtube.tokens && words.length ? await platform('youtube').niche(youtube, words) : [];
   return assistant.review(config, { own, niche, keywords, language });
 }
 
 function retitle(id, title) {
-  const youtube = store.load().youtube || {};
+  const youtube = context('youtube', store.profiles().active);
   if (!youtube.tokens) throw new Error('Compte non connecté.');
   const clean = (title || '').trim();
   if (!clean || clean.length > LIMITS.youtube.title) throw new Error(`Le titre doit faire entre 1 et ${LIMITS.youtube.title} caractères.`);
-  return platform('youtube').retitle(context('youtube', youtube), id, clean);
+  return platform('youtube').retitle(youtube, id, clean);
 }
 
 // Une erreur levée dans un gestionnaire arrive côté interface préfixée par Electron
@@ -188,14 +214,33 @@ handle('config:save', (_e, id, values) => {
   saveConfig(id, values);
   return describe();
 });
-handle('connect', async (_e, id) => {
-  await connect(id);
+handle('connect', async (event, id) => {
+  await connect(BrowserWindow.fromWebContents(event.sender), id);
   return describe();
 });
 handle('disconnect', (_e, id) => {
   platform(id);
-  store.update(id, { tokens: null, account: null });
+  store.setAccount(id, { tokens: null, account: null });
   return describe();
+});
+// Chaque changement de profil renvoie les profils et les plateformes du profil actif.
+const profileState = () => ({ profiles: store.profiles(), platforms: describe() });
+handle('profiles:state', () => profileState());
+handle('profiles:add', (_e, name) => {
+  store.addProfile(name);
+  return profileState();
+});
+handle('profiles:rename', (_e, id, name) => {
+  store.renameProfile(id, name);
+  return profileState();
+});
+handle('profiles:remove', (_e, id) => {
+  store.removeProfile(id);
+  return profileState();
+});
+handle('profiles:use', (_e, id) => {
+  store.useProfile(id);
+  return profileState();
 });
 handle('video:pick', async (event) => {
   const picked = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {

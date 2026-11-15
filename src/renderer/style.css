@@ -24,6 +24,13 @@ body {
 .tabs { display: flex; gap: 4px; padding: 12px 24px 0; border-bottom: 1px solid var(--line); }
 .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); padding: 8px 14px; }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.tabs .profile { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; padding-bottom: 6px; }
+.tabs .profile select { width: auto; min-width: 160px; margin: 0; padding: 5px 8px; }
+.profiles { list-style: none; padding: 0; margin: 12px 0 0; }
+.profiles li { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.profiles input[type="text"] { margin: 0; }
+.settings form.row input[type="text"] { margin: 0; }
+.profiles button, .settings form.row button { white-space: nowrap; }
 
 .stats { padding: 8px 24px 24px; }
 .stats .row { display: flex; align-items: center; gap: 8px; }

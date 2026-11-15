@@ -14,6 +14,7 @@ const state = {
   stats: [],
   assistant: null,
   advice: null,
+  profiles: null,
 };
 // Éléments de chaque carte mis à jour sans reconstruire la liste, par identifiant de plateforme.
 const refs = {};
@@ -29,19 +30,35 @@ function showError(message) {
   $('error').hidden = !message;
 }
 
+// Préférences de l'interface propres au profil actif. Celles d'avant les profils reviennent au
+// premier profil.
+function getPref(key) {
+  try {
+    const scoped = localStorage.getItem(`${key}:${state.profiles.active}`);
+    if (scoped !== null) return scoped;
+    return state.profiles.list[0].id === state.profiles.active ? localStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setPref(key, value) {
+  try {
+    localStorage.setItem(`${key}:${state.profiles.active}`, value);
+  } catch {}
+}
+
 // La sélection est un confort : si le stockage local manque, on coche ce qui est connecté.
 function loadSelection() {
   try {
-    const saved = JSON.parse(localStorage.getItem('selection'));
+    const saved = JSON.parse(getPref('selection'));
     if (Array.isArray(saved)) return new Set(saved);
   } catch {}
   return null;
 }
 
 function saveSelection() {
-  try {
-    localStorage.setItem('selection', JSON.stringify([...state.selected]));
-  } catch {}
+  setPref('selection', JSON.stringify([...state.selected]));
 }
 
 function currentPost() {
@@ -64,7 +81,7 @@ function setPlatforms(list) {
 }
 
 function statusText(p) {
-  if (p.assisted) return 'Mode assisté';
+  if (p.assisted) return 'Mode assisté, compte de ton navigateur';
   if (p.connected) return `Connecté : ${p.account}`;
   return p.configured ? 'Non connecté' : 'À configurer';
 }
@@ -80,7 +97,8 @@ function card(p) {
   });
 
   const configure = el('button', { className: 'ghost', textContent: 'Configurer', disabled: state.busy });
-  configure.addEventListener('click', () => openSettings(p));
+  // Facebook n'a pas d'identifiants propres : on ouvre ceux d'Instagram.
+  configure.addEventListener('click', () => openSettings(state.platforms.find((q) => q.id === (p.configFrom || p.id))));
 
   const link = el('button', { textContent: p.connected && !p.assisted ? 'Déconnecter' : 'Connecter', disabled: state.busy || !p.configured || p.assisted });
   link.addEventListener('click', async () => {
@@ -251,9 +269,7 @@ drop.addEventListener('drop', async (e) => {
 for (const id of ['title', 'caption', 'keywords']) $(id).addEventListener('input', scheduleCheck);
 function setKeywords(value) {
   $('keywords').value = value;
-  try {
-    localStorage.setItem('keywords', value);
-  } catch {}
+  setPref('keywords', value);
 }
 $('keywords').addEventListener('input', () => setKeywords($('keywords').value));
 
@@ -275,6 +291,7 @@ function renderScore(rules) {
 $('publish').addEventListener('click', async () => {
   const ids = targets();
   state.busy = true;
+  $('profile').disabled = true;
   state.results = {};
   state.progress = Object.fromEntries(ids.map((id) => [id, { phase: 'En attente', fraction: 0 }]));
   showError('');
@@ -286,6 +303,7 @@ $('publish').addEventListener('click', async () => {
     showError(e.message);
   }
   state.busy = false;
+  $('profile').disabled = false;
   state.progress = {};
   render();
 });
@@ -510,6 +528,7 @@ function renderAdvice() {
     proposal('Catégorie YouTube', category.name),
     proposal('Description YouTube', advice.captions.youtube),
     proposal('Légende Instagram', advice.captions.instagram),
+    proposal('Légende Facebook', advice.captions.facebook),
     proposal('Légende TikTok', advice.captions.tiktok),
     apply,
     el('h3', { textContent: 'Pourquoi ces choix' }),
@@ -517,7 +536,7 @@ function renderAdvice() {
   );
 }
 
-// La description YouTube devient la légende commune ; Instagram et TikTok reçoivent la leur.
+// La description YouTube devient la légende commune ; les autres plateformes reçoivent la leur.
 // Les mots-clés proposés ne remplacent pas ceux que l'utilisateur a déjà choisis.
 function applyAdvice() {
   const { title, categoryId, captions, keywords } = state.advice;
@@ -526,6 +545,7 @@ function applyAdvice() {
   $('caption').value = captions.youtube;
   setCategory(categoryId);
   state.overrides.instagram = captions.instagram;
+  state.overrides.facebook = captions.facebook;
   state.overrides.tiktok = captions.tiktok;
   scheduleCheck();
   render();
@@ -533,9 +553,7 @@ function applyAdvice() {
 
 function setCategory(id) {
   $('category').value = id;
-  try {
-    localStorage.setItem('category', id);
-  } catch {}
+  setPref('category', id);
 }
 
 $('category').addEventListener('change', (e) => setCategory(e.target.value));
@@ -560,6 +578,68 @@ $('advise').addEventListener('click', async () => {
   }
   button.textContent = label;
   renderAssistant();
+});
+
+// Profils : chacun a ses comptes, ses mots-clés, sa catégorie et sa sélection de plateformes.
+function applyProfiles({ profiles, platforms }) {
+  const changed = !state.profiles || state.profiles.active !== profiles.active;
+  state.profiles = profiles;
+  $('profile').replaceChildren(...profiles.list.map((p) => el('option', { value: p.id, textContent: p.name })));
+  $('profile').value = profiles.active;
+  renderProfileList();
+  if (changed) {
+    const category = getPref('category');
+    $('category').value = state.categories.some((c) => c.id === category) ? category : state.categoryInitial;
+    $('keywords').value = getPref('keywords') || '';
+    state.selected = loadSelection() || new Set(platforms.filter((p) => p.connected).map((p) => p.id));
+    state.results = {};
+    statsLoaded = false;
+    state.stats = [];
+    $('stats').replaceChildren();
+    $('review').hidden = true;
+    if (!$('page-stats').hidden) loadStats();
+    scheduleCheck();
+  }
+  setPlatforms(platforms);
+}
+
+async function profileAction(action) {
+  $('profile-error').hidden = true;
+  try {
+    applyProfiles(await action());
+  } catch (e) {
+    $('profile-error').textContent = e.message;
+    $('profile-error').hidden = false;
+    $('profile').value = state.profiles.active;
+  }
+}
+
+function renderProfileList() {
+  const single = state.profiles.list.length < 2;
+  $('profile-list').replaceChildren(
+    ...state.profiles.list.map((p) => {
+      const name = el('input', { type: 'text', value: p.name, maxLength: 40 });
+      const rename = el('button', { textContent: 'Renommer' });
+      rename.addEventListener('click', () => profileAction(() => api.renameProfile(p.id, name.value)));
+      const remove = el('button', { className: 'ghost', textContent: 'Supprimer', disabled: single });
+      remove.addEventListener('click', () => {
+        if (confirm(`Supprimer le profil « ${p.name} » ? Ses comptes connectés seront oubliés par Vertipost.`)) {
+          profileAction(() => api.removeProfile(p.id));
+        }
+      });
+      return el('li', {}, name, rename, remove);
+    }),
+  );
+}
+
+$('profile').addEventListener('change', (e) => profileAction(() => api.useProfile(e.target.value)));
+$('profile-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  profileAction(async () => {
+    const result = await api.addProfile($('profile-name').value);
+    $('profile-name').value = '';
+    return result;
+  });
 });
 
 // Champ de réglage : liste de choix, ou texte masqué quand c'est un secret.
@@ -615,22 +695,14 @@ $('settings').querySelector('form').addEventListener('submit', async (e) => {
     const categories = await api.categories();
     state.categories = categories.list;
     $('category').replaceChildren(...categories.list.map((c) => el('option', { value: c.id, textContent: c.name })));
-    let category = null;
+    state.categoryInitial = categories.initial;
     try {
-      category = localStorage.getItem('category');
-    } catch {}
-    $('category').value = categories.list.some((c) => c.id === category) ? category : categories.initial;
-    try {
-      $('keywords').value = localStorage.getItem('keywords') || '';
       $('language').value = localStorage.getItem('language') || '';
     } catch {}
-    scheduleCheck();
     state.assistant = await api.assistantState();
     renderAssistantSettings();
     renderAssistant();
-    const list = await api.state();
-    state.selected = loadSelection() || new Set(list.filter((p) => p.connected).map((p) => p.id));
-    setPlatforms(list);
+    applyProfiles(await api.profiles());
   } catch (e) {
     showError(e.message);
   }

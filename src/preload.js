@@ -8,6 +8,11 @@ async function call(channel, ...args) {
 
 contextBridge.exposeInMainWorld('vertipost', {
   state: () => call('state'),
+  profiles: () => call('profiles:state'),
+  addProfile: (name) => call('profiles:add', name),
+  renameProfile: (id, name) => call('profiles:rename', id, name),
+  removeProfile: (id) => call('profiles:remove', id),
+  useProfile: (id) => call('profiles:use', id),
   saveConfig: (id, values) => call('config:save', id, values),
   connect: (id) => call('connect', id),
   disconnect: (id) => call('disconnect', id),
