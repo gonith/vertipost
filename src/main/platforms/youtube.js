@@ -1,4 +1,5 @@
 const { authorize, PORT } = require('../oauth');
+const fs = require('fs');
 const { request, sendFile } = require('../lib/http');
 const { categoryOf } = require('../lib/advice');
 
@@ -106,12 +107,32 @@ async function publish(ctx) {
     throw new Error(`L'envoi à YouTube a échoué (${sent.status}) : ${sent.text.slice(0, 600)}`);
   }
 
+  const notes = [];
   const got = sent.data.status && sent.data.status.privacyStatus;
-  const note =
-    got && got !== wanted
-      ? `YouTube l'a enregistrée en « ${got} » au lieu de « ${wanted} ». C'est le verrou des projets Google non audités.`
-      : null;
-  return { url: `https://www.youtube.com/shorts/${sent.data.id}`, note };
+  if (got && got !== wanted) notes.push(`YouTube l'a enregistrée en « ${got} » au lieu de « ${wanted} ». C'est le verrou des projets Google non audités.`);
+  if (post.thumbnail) {
+    progress('Miniature', 1);
+    const failed = await setThumbnail(access, sent.data.id, post.thumbnail.path);
+    if (failed) notes.push(failed);
+  }
+  return { url: `https://www.youtube.com/shorts/${sent.data.id}`, note: notes.join(' ') || null };
+}
+
+// Une miniature refusée ne retire pas la vidéo publiée : on rend la raison, ou null si tout va bien.
+async function setThumbnail(access, id, file) {
+  try {
+    await request(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${id}&uploadType=media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'image/jpeg' },
+      body: await fs.promises.readFile(file),
+    });
+    return null;
+  } catch (e) {
+    if (e.status === 403) {
+      return "Miniature non appliquée : YouTube n'accepte les miniatures personnalisées que des chaînes validées par téléphone (youtube.com/verify).";
+    }
+    return `Miniature non appliquée : ${e.message}`;
+  }
 }
 
 // Les dernières vidéos de la chaîne avec leurs compteurs. La liste des envois de la chaîne

@@ -131,4 +131,22 @@ async function inspect(filePath) {
   };
 }
 
-module.exports = { inspect, faststart, lighten };
+// Miniature en JPEG dans le dossier temporaire : l'image de la vidéo à `seconds`, ou une image
+// choisie à part, ramenée à 1920 pixels au plus (YouTube refuse une miniature de plus de 2 Mo).
+function thumbnail(source, seconds) {
+  const out = path.join(os.tmpdir(), `vertipost-miniature-${crypto.randomUUID()}.jpg`);
+  const at = seconds === undefined ? [] : ['-ss', String(Math.max(0, seconds))];
+  const args = [
+    '-v', 'error', '-y', ...at, '-i', source, '-frames:v', '1',
+    '-vf', "scale='min(1920,iw)':'min(1920,ih)':force_original_aspect_ratio=decrease",
+    '-q:v', '3', out,
+  ];
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', args, { windowsHide: true, timeout: 30_000 }, (error, _stdout, stderr) => {
+      if (!error) return resolve({ path: out, url: pathToFileURL(out).href, offset: seconds === undefined ? null : seconds });
+      reject(new Error(`ffmpeg n'a pas pu préparer la miniature : ${(stderr || error.message).trim().slice(0, 300)}`));
+    });
+  });
+}
+
+module.exports = { inspect, faststart, lighten, thumbnail };

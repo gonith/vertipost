@@ -1,4 +1,4 @@
-const { request, sendFile, sleep } = require('../lib/http');
+const { request, sendFile, postImage, sleep } = require('../lib/http');
 const meta = require('./meta');
 
 // Les Reels se publient sur une Page Facebook, jamais sur un profil personnel : l'API ne le
@@ -24,7 +24,7 @@ async function connect(config, { choose }) {
 
 const absolute = (url) => (url && url.startsWith('/') ? `https://www.facebook.com${url}` : url || null);
 
-async function publish({ tokens, video, caption, progress }) {
+async function publish({ tokens, video, post, caption, progress }) {
   const reels = `${GRAPH}/${tokens.pageId}/video_reels`;
   progress('Préparation', 0);
   const start = await request(reels, { form: { upload_phase: 'start', access_token: tokens.access } });
@@ -43,6 +43,17 @@ async function publish({ tokens, video, caption, progress }) {
     throw new Error(`L'envoi à Facebook a échoué (${sent.status}) : ${sent.text.slice(0, 600)}`);
   }
 
+  // La couverture se dépose avant la publication, pour que le Reel paraisse avec elle.
+  const notes = [];
+  if (post.thumbnail) {
+    progress('Miniature', 1);
+    try {
+      await postImage(`${GRAPH}/${id}/thumbnails`, { is_preferred: true, access_token: tokens.access }, post.thumbnail.path);
+    } catch (e) {
+      notes.push(`Miniature non appliquée : ${e.message}`);
+    }
+  }
+
   progress('Publication', 1);
   await request(reels, {
     form: { upload_phase: 'finish', video_id: id, video_state: 'PUBLISHED', description: caption, access_token: tokens.access },
@@ -50,7 +61,6 @@ async function publish({ tokens, video, caption, progress }) {
 
   // Facebook traite la vidéo puis la publie : on attend la fin pour donner le lien.
   progress('Traitement', 1);
-  let note = null;
   for (let i = 0; ; i++) {
     const { data } = await request(`${GRAPH}/${id}?${query({ fields: 'status', access_token: tokens.access })}`);
     const status = data.status || {};
@@ -61,13 +71,13 @@ async function publish({ tokens, video, caption, progress }) {
     }
     if (status.publishing_phase && status.publishing_phase.status === 'complete') break;
     if (i === 60) {
-      note = 'Facebook traite encore la vidéo : elle apparaîtra sur la Page dans quelques minutes.';
+      notes.push('Facebook traite encore la vidéo : elle apparaîtra sur la Page dans quelques minutes.');
       break;
     }
     await sleep(5000);
   }
   const link = await request(`${GRAPH}/${id}?${query({ fields: 'permalink_url', access_token: tokens.access })}`);
-  return { url: absolute(link.data.permalink_url), note };
+  return { url: absolute(link.data.permalink_url), note: notes.join(' ') || null };
 }
 
 // Les derniers Reels de la Page. Les lectures demandent l'autorisation read_insights.

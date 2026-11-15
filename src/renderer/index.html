@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src file:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src file:; img-src file:">
   <title>Vertipost</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -23,6 +23,17 @@
       </div>
       <p id="file-info" class="muted"></p>
       <button id="change" class="ghost" hidden>Changer de vidéo</button>
+      <div id="thumb" class="thumb" hidden>
+        <p class="name">Miniature</p>
+        <img id="thumb-img" alt="Miniature choisie" hidden>
+        <p id="thumb-hint" class="muted">Avance la vidéo jusqu'à la bonne image, ou choisis une image à part. Sans miniature, chaque plateforme prend la sienne.</p>
+        <div class="row">
+          <button id="thumb-frame">Utiliser l'image affichée</button>
+          <button id="thumb-pick" class="ghost">Choisir une image...</button>
+        </div>
+        <button id="thumb-clear" class="ghost" hidden>Retirer la miniature</button>
+        <p id="thumb-error" class="bad" hidden></p>
+      </div>
     </section>
 
     <section class="form">

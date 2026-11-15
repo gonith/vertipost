@@ -43,14 +43,21 @@ const STUDIO = 'https://www.tiktok.com/tiktokstudio/upload';
 
 // Rien n'est envoyé : la légende va dans le presse-papiers, le fichier est montré dans
 // l'Explorateur et la page d'envoi de TikTok s'ouvre dans le navigateur.
-async function assist({ video, caption }) {
+async function assist({ video, post, caption }) {
   clipboard.writeText(caption);
   shell.showItemInFolder(video.path);
   await shell.openExternal(STUDIO);
+  // La couverture se choisit dans TikTok Studio : on rappelle laquelle.
+  const thumb = post.thumbnail;
+  const cover = !thumb
+    ? ''
+    : thumb.offset !== null && thumb.offset !== undefined
+      ? ` Pour la couverture, prends l'image à ${thumb.offset.toFixed(1).replace('.', ',')} s.`
+      : ' Pour la couverture, importe ta miniature dans « Modifier la couverture ».';
   return {
     url: null,
     label: 'À terminer dans TikTok.',
-    note: "La page d'envoi de TikTok est ouverte, ta vidéo est affichée dans l'Explorateur et la légende est copiée : glisse la vidéo dans la page, colle la légende (Ctrl+V) et publie.",
+    note: `La page d'envoi de TikTok est ouverte, ta vidéo est affichée dans l'Explorateur et la légende est copiée : glisse la vidéo dans la page, colle la légende (Ctrl+V) et publie.${cover}`,
   };
 }
 

@@ -24,6 +24,12 @@ body {
 .tabs { display: flex; gap: 4px; padding: 12px 24px 0; border-bottom: 1px solid var(--line); }
 .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); padding: 8px 14px; }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.thumb { margin-top: 16px; }
+.thumb .name { font-weight: 600; margin: 0 0 8px; }
+.thumb img { display: block; max-width: 140px; max-height: 250px; border-radius: 6px; border: 1px solid var(--line); margin-bottom: 8px; }
+.thumb .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.thumb p { font-size: 13px; }
+#thumb-clear { margin-top: 8px; }
 .tabs .profile { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; padding-bottom: 6px; }
 .tabs .profile select { width: auto; min-width: 160px; margin: 0; padding: 5px 8px; }
 .profiles { list-style: none; padding: 0; margin: 12px 0 0; }

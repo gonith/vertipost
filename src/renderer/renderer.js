@@ -15,6 +15,7 @@ const state = {
   assistant: null,
   advice: null,
   profiles: null,
+  thumbnail: null,
 };
 // Éléments de chaque carte mis à jour sans reconstruire la liste, par identifiant de plateforme.
 const refs = {};
@@ -68,6 +69,7 @@ function currentPost() {
     privacy: $('privacy').value,
     categoryId: $('category').value,
     overrides: state.overrides,
+    thumbnail: state.thumbnail && { path: state.thumbnail.path, offset: state.thumbnail.offset },
   };
 }
 
@@ -223,6 +225,8 @@ function setVideo(video) {
   $('drop-hint').hidden = true;
   $('drop').classList.add('filled');
   $('change').hidden = false;
+  $('thumb').hidden = false;
+  setThumbnail(null);
   const info = video.info
     ? `${video.info.width}x${video.info.height}, ${Math.round(video.info.duration)} s, ${megabytes(video.size)}`
     : `${megabytes(video.size)} (ffprobe introuvable : format non vérifié)`;
@@ -312,6 +316,44 @@ api.onProgress(({ id, phase, fraction }) => {
   state.progress[id] = { phase, fraction };
   renderProgress();
 });
+
+// Miniature : une seule image, envoyée à chaque plateforme qui l'accepte.
+function setThumbnail(thumb) {
+  state.thumbnail = thumb;
+  $('thumb-img').hidden = !thumb;
+  if (thumb) $('thumb-img').src = thumb.url;
+  else $('thumb-img').removeAttribute('src');
+  $('thumb-clear').hidden = !thumb;
+  $('thumb-hint').textContent = !thumb
+    ? "Avance la vidéo jusqu'à la bonne image, ou choisis une image à part. Sans miniature, chaque plateforme prend la sienne."
+    : thumb.offset === null
+      ? 'Image choisie à part. TikTok ne la reçoit pas : tu la choisiras dans TikTok Studio.'
+      : `Image de la vidéo à ${thumb.offset.toFixed(1).replace('.', ',')} s.`;
+  $('thumb-error').hidden = true;
+}
+
+async function thumbAction(button, action) {
+  if (state.busy) return;
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Préparation...';
+  try {
+    const thumb = await action();
+    if (thumb) setThumbnail(thumb);
+  } catch (e) {
+    $('thumb-error').textContent = e.message;
+    $('thumb-error').hidden = false;
+  }
+  button.disabled = false;
+  button.textContent = label;
+}
+
+$('thumb-frame').addEventListener('click', () => {
+  $('preview').pause();
+  thumbAction($('thumb-frame'), () => api.thumbFrame(state.video.path, $('preview').currentTime));
+});
+$('thumb-pick').addEventListener('click', () => thumbAction($('thumb-pick'), () => api.pickThumb()));
+$('thumb-clear').addEventListener('click', () => setThumbnail(null));
 
 // Onglets.
 function showTab(name) {

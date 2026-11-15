@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { request, sendFile, sleep } = require('../lib/http');
+const { request, sendFile, postImage, sleep } = require('../lib/http');
 const { faststart, lighten } = require('../video');
 const { lighterSize } = require('../lib/rules');
 const meta = require('./meta');
@@ -15,6 +15,8 @@ const SCOPES = [
   'business_management',
   // Sert uniquement aux statistiques : vues, portée, partages et enregistrements.
   'instagram_manage_insights',
+  // Sert uniquement à la miniature choisie à part : voir hostCover.
+  'pages_manage_posts',
 ];
 
 async function connect(config, { choose }) {
@@ -27,15 +29,59 @@ async function connect(config, { choose }) {
   }
   const page = await meta.pick(linked, (p) => `@${p.instagram_business_account.username}`, choose, 'Quel compte Instagram relier à ce profil ?');
   return {
-    tokens: { access, expiresAt, igUserId: page.instagram_business_account.id },
+    tokens: { access, expiresAt, igUserId: page.instagram_business_account.id, pageId: page.id },
     account: `@${page.instagram_business_account.username}`,
   };
 }
 
-async function publish({ tokens, video, caption, progress }) {
+// Instagram ne prend une couverture que par son adresse web. Une image de la vidéo se désigne par
+// son instant ; une image choisie à part est déposée en photo non publiée sur la Page reliée, le
+// temps qu'Instagram la récupère, puis supprimée.
+async function hostCover(tokens, file) {
+  const page = await request(`${GRAPH}/${tokens.pageId}?fields=access_token&access_token=${tokens.access}`);
+  const pageToken = page.data.access_token;
+  const photo = await postImage(`${GRAPH}/${tokens.pageId}/photos`, { published: false, access_token: pageToken }, file);
+  const remove = () => request(`${GRAPH}/${photo.data.id}?access_token=${pageToken}`, { method: 'DELETE' }).catch(() => {});
+  try {
+    const info = await request(`${GRAPH}/${photo.data.id}?fields=images&access_token=${pageToken}`);
+    const image = (info.data.images || [])[0];
+    if (!image) throw new Error("Facebook n'a pas rendu l'adresse de l'image.");
+    return { url: image.source, remove };
+  } catch (e) {
+    await remove();
+    throw e;
+  }
+}
+
+async function publish(ctx) {
+  const { tokens, post } = ctx;
   if (Date.now() > tokens.expiresAt) {
     throw new Error('Session Instagram expirée (elle dure environ 60 jours), reconnecte le compte.');
   }
+  const notes = [];
+  let cover = {};
+  let hosted = null;
+  if (post.thumbnail && post.thumbnail.offset !== null && post.thumbnail.offset !== undefined) {
+    cover = { thumb_offset: Math.round(post.thumbnail.offset * 1000) };
+  } else if (post.thumbnail && !tokens.pageId) {
+    notes.push('Miniature non appliquée : pour une image choisie à part, déconnecte puis reconnecte Instagram, une autorisation de plus est nécessaire.');
+  } else if (post.thumbnail) {
+    try {
+      hosted = await hostCover(tokens, post.thumbnail.path);
+      cover = { cover_url: hosted.url };
+    } catch (e) {
+      notes.push(`Miniature non appliquée : ${e.message}`);
+    }
+  }
+  try {
+    const result = await send({ ...ctx, cover });
+    return { url: result.url, note: [...notes, result.note].filter(Boolean).join(' ') || null };
+  } finally {
+    if (hosted) await hosted.remove();
+  }
+}
+
+async function send({ tokens, video, caption, progress, cover }) {
   const auth = { Authorization: `OAuth ${tokens.access}` };
 
   progress('Préparation', 0);
@@ -51,12 +97,12 @@ async function publish({ tokens, video, caption, progress }) {
     // Instagram refuse un fichier dont l'index est à la fin : on lui en envoie une copie réordonnée.
     const file = video.info && video.info.moovFirst === false ? await sized(await faststart(video.path)) : video;
     try {
-      id = await upload({ tokens, auth, caption, progress, file, attempts: light ? 2 : 4 });
+      id = await upload({ tokens, auth, caption, cover, progress, file, attempts: light ? 2 : 4 });
     } catch (e) {
       // Un fichier refusé pour son volume d'images passe une fois allégé : voir lighterSize.
       if (!e.flaky || !light) throw e;
       progress('Allègement de la vidéo', 0);
-      id = await upload({ tokens, auth, caption, progress, file: await sized(await lighten(video.path, light)), attempts: 3 });
+      id = await upload({ tokens, auth, caption, cover, progress, file: await sized(await lighten(video.path, light)), attempts: 3 });
       note = `Instagram a refusé le fichier d'origine : c'est une copie allégée (${light.width} pixels de large) qui a été publiée.`;
     }
   } finally {
@@ -93,14 +139,14 @@ async function publish({ tokens, video, caption, progress }) {
 // non rejouable, alors que le même fichier peut passer à l'essai suivant quand son volume
 // d'images est proche de la limite (voir lighterSize). Un conteneur refusé est perdu, chaque
 // essai en ouvre donc un neuf. L'erreur finale porte `flaky` quand c'est ce refus-là.
-async function upload({ tokens, auth, caption, progress, file, attempts }) {
+async function upload({ tokens, auth, caption, cover, progress, file, attempts }) {
   let last;
   let flaky = false;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const phase = attempt === 1 ? 'Envoi' : `Envoi, nouvel essai ${attempt} sur ${attempts}`;
     const container = await request(`${GRAPH}/${tokens.igUserId}/media`, {
       headers: { Authorization: `Bearer ${tokens.access}` },
-      json: { media_type: 'REELS', upload_type: 'resumable', caption, share_to_feed: true },
+      json: { media_type: 'REELS', upload_type: 'resumable', caption, share_to_feed: true, ...cover },
     });
     const { id, uri } = container.data;
     if (!id || !uri) throw new Error("Instagram n'a pas ouvert de session d'envoi.");

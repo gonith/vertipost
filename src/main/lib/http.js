@@ -60,6 +60,19 @@ function sendFile(url, { method = 'PUT', headers = {}, filePath, start, end, onP
   });
 }
 
+// Envoi multipart d'une image JPEG, avec des champs texte : Meta n'accepte une photo que sous cette forme.
+async function postImage(url, fields, filePath, name = 'source') {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.append(key, String(value));
+  form.append(name, new Blob([await fs.promises.readFile(filePath)], { type: 'image/jpeg' }), 'miniature.jpg');
+  const res = await fetch(url, { method: 'POST', body: form });
+  const text = await res.text();
+  if (!res.ok) {
+    throw Object.assign(new Error(`${label('POST', url)} a répondu ${res.status} : ${text.slice(0, 600)}`), { status: res.status });
+  }
+  return { status: res.status, data: parse(text) };
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { request, sendFile, sleep, label };
+module.exports = { request, sendFile, postImage, sleep, label };

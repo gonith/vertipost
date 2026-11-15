@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('vertipost', {
   connect: (id) => call('connect', id),
   disconnect: (id) => call('disconnect', id),
   pickVideo: () => call('video:pick'),
+  thumbFrame: (filePath, seconds) => call('thumb:frame', filePath, seconds),
+  pickThumb: () => call('thumb:pick'),
   // Le chemin d'un fichier déposé n'est lisible que d'ici, pas depuis la page.
   inspectDropped: (file) => call('video:inspect', webUtils.getPathForFile(file)),
   check: (post, info) => call('check', post, info),

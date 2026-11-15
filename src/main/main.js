@@ -3,7 +3,7 @@ const tls = require('tls');
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const store = require('./store');
 const platforms = require('./platforms');
-const { inspect } = require('./video');
+const { inspect, thumbnail } = require('./video');
 const { warnings, captionFor } = require('./lib/rules');
 const { CATEGORIES, DEFAULT_CATEGORY } = require('./lib/advice');
 const assistant = require('./assistant');
@@ -251,6 +251,16 @@ handle('video:pick', async (event) => {
   return picked.canceled ? null : inspect(picked.filePaths[0]);
 });
 handle('video:inspect', (_e, filePath) => inspect(filePath));
+// Miniature : une image de la vidéo à un instant donné, ou une image choisie à part.
+handle('thumb:frame', (_e, filePath, seconds) => thumbnail(filePath, Number(seconds) || 0));
+handle('thumb:pick', async (event) => {
+  const picked = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: 'Choisir une miniature',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+  });
+  return picked.canceled ? null : thumbnail(picked.filePaths[0]);
+});
 handle('check', (_e, post, info) =>
   Object.fromEntries(platforms.map((p) => [p.id, warnings(p.id, post, info)])),
 );
