@@ -57,7 +57,7 @@ test('warnings signale longueur, titre, orientation et durée', () => {
   assert.equal(warnings('youtube', { title: '', caption: '' }, vertical).length, 1);
   assert.equal(warnings('tiktok', { caption: 'a'.repeat(2201) }, vertical).length, 1);
   assert.equal(warnings('tiktok', { caption: 'a'.repeat(2201), overrides: { tiktok: 'court' } }, vertical).length, 0);
-  assert.equal(warnings('instagram', { caption: '' }, { width: 1920, height: 1080, duration: 30 }).length, 1);
+  assert.equal(warnings('instagram', { caption: '' }, { width: 1920, height: 1080, duration: 15 }).length, 1);
   assert.equal(warnings('tiktok', { caption: '' }, { ...vertical, duration: 601 }).length, 1);
   assert.deepEqual(warnings('tiktok', { caption: '' }, null), []);
 });
@@ -105,9 +105,9 @@ test('checklist : signale chaque manque', () => {
 
 test("warnings : le format d'un Reel n'est contrôlé que pour Instagram, et seulement sur les données connues", () => {
   const post = { title: 'T', caption: 'c' };
-  const good = { width: 1080, height: 1920, duration: 30, size: 50 * MB, videoCodec: 'h264', fps: 30, bitrate: 8e6, audioCodec: 'aac', sampleRate: 48000, channels: 2, moovFirst: true };
+  const good = { width: 1080, height: 1920, duration: 15, size: 50 * MB, videoCodec: 'h264', fps: 30, bitrate: 8e6, audioCodec: 'aac', sampleRate: 48000, channels: 2, moovFirst: true };
   assert.deepEqual(warnings('instagram', post, good), []);
-  assert.deepEqual(warnings('instagram', post, { width: 1080, height: 1920, duration: 30 }), []);
+  assert.deepEqual(warnings('instagram', post, { width: 1080, height: 1920, duration: 15 }), []);
   const bad = { ...good, width: 2160, height: 3840, size: 400 * MB, videoCodec: 'vp9', fps: 120, bitrate: 40e6, audioCodec: 'opus', sampleRate: 96000, channels: 6, duration: 2, moovFirst: false };
   assert.equal(warnings('instagram', post, bad).length, 11);
   assert.deepEqual(warnings('youtube', post, bad), []);
@@ -115,14 +115,14 @@ test("warnings : le format d'un Reel n'est contrôlé que pour Instagram, et seu
 
 test('lighterSize : rien pour une vidéo courte, une largeur paire sous le volume admis sinon', () => {
   const hd = { width: 1080, height: 1920, fps: 30 };
-  assert.equal(lighterSize({ ...hd, duration: 30 }), null);
+  assert.equal(lighterSize({ ...hd, duration: 15 }), null);
   assert.equal(lighterSize(null), null);
   const long = lighterSize({ ...hd, duration: 66 });
   assert.equal(long.width % 2, 0);
-  assert.ok(long.width >= 720 && long.width < 760, String(long.width));
-  assert.ok(long.width * (long.width * 16 / 9) * 30 * 66 <= 1.9e9);
+  assert.ok(long.width >= 560 && long.width < 600, String(long.width));
+  assert.ok(long.width * (long.width * 16 / 9) * 30 * 66 <= 1.2e9);
   // Une cadence élevée est ramenée à 30 images par seconde avant de toucher à la taille.
-  assert.deepEqual(lighterSize({ ...hd, fps: 60, duration: 20 }), { width: 1080, fps: 30 });
+  assert.deepEqual(lighterSize({ ...hd, fps: 60, duration: 15 }), { width: 1080, fps: 30 });
 });
 
 test("reviewMessage : mes vidéos avec leur identifiant, la niche quand elle existe, la langue demandée", () => {

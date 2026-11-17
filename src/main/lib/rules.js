@@ -14,7 +14,9 @@ const REEL = { megabytes: 300, codecs: ['h264', 'hevc'], fps: [23, 60], width: 1
 // un 400 « ProcessingFailedError ». Ce délai grandit avec le volume d'images (largeur x hauteur x
 // cadence x durée). Mesuré en octobre 2026 : jusqu'à 1,9 milliard de pixels l'envoi a toujours
 // abouti, au-delà de 3,5 milliards presque jamais, quels que soient le poids et le contenu du fichier.
-const REEL_PIXELS = 1.9e9;
+// Le seuil a baissé depuis : le 17 novembre 2026, 1,30 milliard passait et 1,49 milliard échouait à
+// chaque essai, y compris en 720p, et un envoi en plusieurs morceaux n'y changeait rien.
+const REEL_PIXELS = 1.2e9;
 const LIGHT_FPS = 30;
 
 // Dimensions d'une copie qui tient sous ce volume, ou null si la vidéo y tient déjà.

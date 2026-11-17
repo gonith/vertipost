@@ -97,7 +97,8 @@ async function send({ tokens, video, caption, progress, cover }) {
     // Instagram refuse un fichier dont l'index est à la fin : on lui en envoie une copie réordonnée.
     const file = video.info && video.info.moovFirst === false ? await sized(await faststart(video.path)) : video;
     try {
-      id = await upload({ tokens, auth, caption, cover, progress, file, attempts: light ? 2 : 4 });
+      // Au-dessus du seuil, l'original échoue presque toujours : un seul essai avant d'alléger.
+      id = await upload({ tokens, auth, caption, cover, progress, file, attempts: light ? 1 : 4 });
     } catch (e) {
       // Un fichier refusé pour son volume d'images passe une fois allégé : voir lighterSize.
       if (!e.flaky || !light) throw e;
