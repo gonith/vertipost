@@ -10,23 +10,34 @@ const LIMITS = {
 // Format exigé par Instagram pour un Reel envoyé par l'API, plus strict que les autres plateformes.
 const REEL = { megabytes: 300, codecs: ['h264', 'hevc'], fps: [23, 60], width: 1920, mbps: 25, sampleRate: 48000, seconds: 3 };
 
-// À la fin d'un envoi, Meta passe 20 à 35 secondes sur la vidéo et abandonne vers 32 secondes avec
+// À la fin d'un envoi, Meta passe 20 à 30 secondes sur la vidéo et abandonne vers 33 secondes avec
 // un 400 « ProcessingFailedError ». Ce délai grandit avec le volume d'images (largeur x hauteur x
-// cadence x durée). Mesuré en octobre 2026 : jusqu'à 1,9 milliard de pixels l'envoi a toujours
-// abouti, au-delà de 3,5 milliards presque jamais, quels que soient le poids et le contenu du fichier.
-// Le seuil a baissé depuis : le 17 novembre 2026, 1,30 milliard passait et 1,49 milliard échouait à
-// chaque essai, y compris en 720p, et un envoi en plusieurs morceaux n'y changeait rien.
-const REEL_PIXELS = 1.2e9;
+// cadence x durée) mais change aussi d'un moment à l'autre : en novembre 2026, une même copie de
+// 1,2 milliard de pixels échouait quatre fois sur cinq quand une autre de 1,5 milliard passait.
+// Au-delà de 1,9 milliard presque rien ne passe. Aucun seuil n'étant sûr, l'envoi descend une
+// échelle de copies de plus en plus légères jusqu'à ce que l'une soit acceptée.
+const REEL_PIXELS = 1.9e9;
 const LIGHT_FPS = 30;
+// Petit côté de chaque copie, et nombre de copies à tenter au plus.
+const LADDER = [1080, 720, 540, 480, 360, 240, 160];
+const RUNGS = 4;
 
-// Dimensions d'une copie qui tient sous ce volume, ou null si la vidéo y tient déjà.
-function lighterSize(info) {
-  if (!info || !info.width || !info.height || !info.duration) return null;
+const measurable = (info) => Boolean(info && info.width && info.height && info.duration);
+
+// Vrai quand l'original est trop lourd pour valoir un essai.
+function tooHeavy(info) {
+  return measurable(info) && info.width * info.height * (info.fps || LIGHT_FPS) * info.duration > REEL_PIXELS;
+}
+
+// Copies à tenter, de la plus nette à la plus légère, toutes plus légères que l'original.
+function lighterSizes(info) {
+  if (!measurable(info)) return [];
   const fps = Math.min(info.fps || LIGHT_FPS, LIGHT_FPS);
-  const factor = Math.sqrt(REEL_PIXELS / (info.width * info.height * fps * info.duration));
-  if (factor >= 1 && fps === (info.fps || LIGHT_FPS)) return null;
-  // Les encodeurs veulent des dimensions paires.
-  return { width: Math.floor((info.width * Math.min(factor, 1)) / 2) * 2, fps };
+  const side = Math.min(info.width, info.height);
+  return LADDER.filter((short) => short < side || (short === side && info.fps > fps))
+    .map((short) => ({ width: Math.round((info.width * short) / side / 4) * 4, fps }))
+    .filter(({ width }) => width * width * (info.height / info.width) * fps * info.duration <= REEL_PIXELS)
+    .slice(0, RUNGS);
 }
 
 // Chaque champ de `info` peut manquer : un contrôle sans donnée ne dit rien.
@@ -42,8 +53,8 @@ function reelWarnings(info) {
   if (info.sampleRate > REEL.sampleRate) out.push(`Audio à ${info.sampleRate} Hz : Instagram s'arrête à ${REEL.sampleRate}.`);
   if (info.channels > 2) out.push(`Audio à ${info.channels} canaux : Instagram attend du mono ou du stéréo.`);
   if (info.duration < REEL.seconds) out.push(`Durée inférieure à ${REEL.seconds} secondes, le minimum d'Instagram.`);
-  const light = lighterSize(info);
-  if (light) out.push(`Vidéo lourde pour l'envoi à Instagram, qui refuse souvent ce volume d'images. En cas de refus, Vertipost publiera une copie allégée : ${light.width} pixels de large${light.fps < info.fps ? `, ${light.fps} images par seconde` : ''}.`);
+  const [light] = tooHeavy(info) ? lighterSizes(info) : [];
+  if (light) out.push(`Vidéo trop lourde pour l'envoi à Instagram : Vertipost publiera une copie allégée, au plus ${light.width} pixels de large${light.fps < info.fps ? ` et ${light.fps} images par seconde` : ''}.`);
   if (info.moovFirst === false) out.push("L'index de la vidéo est en fin de fichier, ce qu'Instagram refuse : Vertipost lui enverra une copie corrigée, sans perte de qualité.");
   return out;
 }
@@ -78,4 +89,4 @@ function warnings(platform, post, info) {
   return out;
 }
 
-module.exports = { LIMITS, captionFor, warnings, lighterSize };
+module.exports = { LIMITS, captionFor, warnings, tooHeavy, lighterSizes };

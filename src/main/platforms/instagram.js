@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { request, sendFile, postImage, sleep } = require('../lib/http');
 const { faststart, lighten } = require('../video');
-const { lighterSize } = require('../lib/rules');
+const { tooHeavy, lighterSizes } = require('../lib/rules');
 const meta = require('./meta');
 
 // L'envoi d'un fichier local (« resumable upload ») n'existe que derrière Facebook Login for
@@ -90,26 +90,40 @@ async function send({ tokens, video, caption, progress, cover }) {
     copies.push(file);
     return { path: file, size: (await fs.promises.stat(file)).size };
   };
-  const light = lighterSize(video.info);
+  const ladder = lighterSizes(video.info);
+  const common = { tokens, auth, caption, cover, progress };
   let id;
   let note = null;
-  try {
-    // Instagram refuse un fichier dont l'index est à la fin : on lui en envoie une copie réordonnée.
-    const file = video.info && video.info.moovFirst === false ? await sized(await faststart(video.path)) : video;
+  let refusal = null;
+  // Rend null sur un refus pour volume d'images : on passe alors à une copie plus légère.
+  const attempt = async (file, attempts) => {
     try {
-      // Au-dessus du seuil, l'original échoue presque toujours : un seul essai avant d'alléger.
-      id = await upload({ tokens, auth, caption, cover, progress, file, attempts: light ? 1 : 4 });
+      return await upload({ ...common, file, attempts });
     } catch (e) {
-      // Un fichier refusé pour son volume d'images passe une fois allégé : voir lighterSize.
-      if (!e.flaky || !light) throw e;
-      progress('Allègement de la vidéo', 0);
-      id = await upload({ tokens, auth, caption, cover, progress, file: await sized(await lighten(video.path, light)), attempts: 3 });
-      note = `Instagram a refusé le fichier d'origine : c'est une copie allégée (${light.width} pixels de large) qui a été publiée.`;
+      if (!e.flaky) throw e;
+      refusal = e;
+      return null;
+    }
+  };
+  try {
+    if (!tooHeavy(video.info) || !ladder.length) {
+      // Instagram refuse un fichier dont l'index est à la fin : on lui en envoie une copie réordonnée.
+      const file = video.info && video.info.moovFirst === false ? await sized(await faststart(video.path)) : video;
+      id = await attempt(file, ladder.length ? 2 : 4);
+    }
+    for (const light of ladder) {
+      if (id) break;
+      progress(`Allègement de la vidéo (${light.width} pixels de large)`, 0);
+      id = await attempt(await sized(await lighten(video.path, light)), 2);
+      if (id) note = `Vidéo trop lourde pour Instagram : c'est une copie allégée (${light.width} pixels de large) qui a été publiée.`;
+    }
+    if (!id) {
+      const tried = ladder.length ? `, même réduite à ${ladder[ladder.length - 1].width} pixels de large` : '';
+      throw new Error(`Instagram n'a pas réussi à traiter la vidéo${tried}. Ses serveurs sont peut-être saturés : réessaie plus tard. ${refusal.message}`);
     }
   } finally {
     for (const file of copies) fs.promises.unlink(file).catch(() => {});
   }
-
 
   // Instagram réencode la vidéo avant d'accepter la publication.
   progress('Traitement', 1);
@@ -135,10 +149,22 @@ async function send({ tokens, video, caption, progress, cover }) {
   return { url: media.data.permalink || null, note };
 }
 
+// Meta répond parfois « ProcessingFailedError » à un envoi qu'il finit de traiter juste après : le
+// conteneur est alors bon à publier. Passé ce délai il ne se débloque plus.
+async function finishedAnyway(id, auth) {
+  for (let i = 0; i < 3; i++) {
+    await sleep(4000);
+    const { data } = await request(`${GRAPH}/${id}?fields=status_code`, { headers: auth });
+    if (data.status_code === 'FINISHED') return true;
+    if (data.status_code !== 'IN_PROGRESS') return false;
+  }
+  return false;
+}
+
 // Envoie le fichier dans un conteneur et rend son identifiant.
 // Meta refuse certains envois pourtant complets avec un 400 « ProcessingFailedError » qu'il dit
 // non rejouable, alors que le même fichier peut passer à l'essai suivant quand son volume
-// d'images est proche de la limite (voir lighterSize). Un conteneur refusé est perdu, chaque
+// d'images est proche de la limite (voir lighterSizes). Un conteneur refusé est perdu, chaque
 // essai en ouvre donc un neuf. L'erreur finale porte `flaky` quand c'est ce refus-là.
 async function upload({ tokens, auth, caption, cover, progress, file, attempts }) {
   let last;
@@ -163,6 +189,7 @@ async function upload({ tokens, auth, caption, cover, progress, file, attempts }
     if (last.status < 300 && last.data.success !== false) return id;
     flaky = Boolean(last.status === 400 && last.data.debug_info && last.data.debug_info.type === 'ProcessingFailedError');
     if (!flaky) break;
+    if (await finishedAnyway(id, auth)) return id;
   }
   throw Object.assign(new Error(`L'envoi à Instagram a échoué (${last.status}) : ${last.text.slice(0, 600)}`), { flaky });
 }

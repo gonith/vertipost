@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { challenge } = require('../src/main/lib/pkce');
 const { MB, tiktokPlan } = require('../src/main/lib/chunks');
-const { captionFor, warnings, lighterSize } = require('../src/main/lib/rules');
+const { captionFor, warnings, tooHeavy, lighterSizes } = require('../src/main/lib/rules');
 const { adviceMessage, categoryOf, geminiSchema } = require('../src/main/lib/advice');
 const { keywordsOf, checklist } = require('../src/main/lib/score');
 const { reviewMessage } = require('../src/main/lib/review');
@@ -113,16 +113,20 @@ test("warnings : le format d'un Reel n'est contrôlé que pour Instagram, et seu
   assert.deepEqual(warnings('youtube', post, bad), []);
 });
 
-test('lighterSize : rien pour une vidéo courte, une largeur paire sous le volume admis sinon', () => {
+test('lighterSizes : des copies de plus en plus légères, toutes sous le volume admis', () => {
   const hd = { width: 1080, height: 1920, fps: 30 };
-  assert.equal(lighterSize({ ...hd, duration: 15 }), null);
-  assert.equal(lighterSize(null), null);
-  const long = lighterSize({ ...hd, duration: 66 });
-  assert.equal(long.width % 2, 0);
-  assert.ok(long.width >= 560 && long.width < 600, String(long.width));
-  assert.ok(long.width * (long.width * 16 / 9) * 30 * 66 <= 1.2e9);
+  assert.deepEqual(lighterSizes(null), []);
+  assert.equal(tooHeavy(null), false);
+  assert.equal(tooHeavy({ ...hd, duration: 15 }), false);
+  assert.equal(tooHeavy({ ...hd, duration: 66 }), true);
+  // La vidéo refusée le 22 novembre 2026 : 1080x1920, 60 images par seconde, 54,5 s.
+  assert.deepEqual(lighterSizes({ ...hd, fps: 60, duration: 54.52 }).map((l) => l.width), [720, 540, 480, 360]);
   // Une cadence élevée est ramenée à 30 images par seconde avant de toucher à la taille.
-  assert.deepEqual(lighterSize({ ...hd, fps: 60, duration: 15 }), { width: 1080, fps: 30 });
+  assert.deepEqual(lighterSizes({ ...hd, fps: 60, duration: 15 })[0], { width: 1080, fps: 30 });
+  // En paysage, c'est la hauteur qui est le petit côté.
+  assert.deepEqual(lighterSizes({ width: 1920, height: 1080, fps: 30, duration: 60 })[0], { width: 1280, fps: 30 });
+  // Même un Reel de 15 minutes garde des copies possibles.
+  assert.ok(lighterSizes({ ...hd, duration: 900 }).length >= 1);
 });
 
 test("reviewMessage : mes vidéos avec leur identifiant, la niche quand elle existe, la langue demandée", () => {
